@@ -1,0 +1,623 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Математика в жизни</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600;700&family=Unbounded:wght@500;700&display=swap">
+<style>
+/* Layout: one phone-width column on squared exercise-book paper; each screen is one sheet; the result prints as a till receipt */
+:root{
+  --paper:#f1f4f9;
+  --grid:#dce4ef;
+  --sheet:#ffffff;
+  --ink:#16203a;
+  --ink-soft:#56627d;
+  --line:#d3dae7;
+  --pen:#2644c8;
+  --pen-soft:#e8ecfc;
+  --red:#c63a2c;
+  --red-soft:#fbe9e6;
+  --ok:#1c7d46;
+  --ok-soft:#e2f2e8;
+  --marker:#ffe25e;
+  --marker-ink:#201c05;
+  --marker-field:#fff8d6;
+  --receipt:#fffdf5;
+  --receipt-ink:#27241e;
+  --receipt-faint:#968f7d;
+  --r-ok:#1c7643;
+  --r-bad:#bf3527;
+  --shadow:rgba(22,32,58,.16);
+  --f-display:"Unbounded","Golos Text",system-ui,sans-serif;
+  --f-body:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#0e1422; --grid:#172036; --sheet:#151d31; --ink:#e7ebf5; --ink-soft:#98a3bd; --line:#2a3552;
+    --pen:#93a6ff; --pen-soft:#1f2a50; --red:#ff8a7a; --red-soft:#3b1f22; --ok:#62d394; --ok-soft:#143022;
+    --shadow:rgba(0,0,0,.5);
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#0e1422; --grid:#172036; --sheet:#151d31; --ink:#e7ebf5; --ink-soft:#98a3bd; --line:#2a3552;
+  --pen:#93a6ff; --pen-soft:#1f2a50; --red:#ff8a7a; --red-soft:#3b1f22; --ok:#62d394; --ok-soft:#143022;
+  --shadow:rgba(0,0,0,.5);
+  color-scheme:dark;
+}
+*,*::before,*::after{box-sizing:border-box}
+body{
+  background-color:var(--paper);
+  background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+  background-size:22px 22px;
+  color:var(--ink);
+  font-family:var(--f-body);
+  font-size:17px;
+  line-height:1.5;
+  -webkit-text-size-adjust:100%;
+}
+.wrap{
+  max-width:560px; margin:0 auto;
+  padding-left:max(16px, env(safe-area-inset-left, 0px));
+  padding-right:max(16px, env(safe-area-inset-right, 0px));
+  padding-block:18px 56px;
+}
+:focus-visible{outline:3px solid var(--pen); outline-offset:2px}
+
+/* top bar */
+.topbar{display:flex; justify-content:space-between; gap:12px; font:600 12px var(--f-mono); text-transform:uppercase; letter-spacing:.08em; color:var(--ink-soft); padding-bottom:10px; border-bottom:1px solid var(--line)}
+
+/* start */
+.display{font-family:var(--f-display); font-weight:700; font-size:clamp(28px, 8.4vw, 44px); line-height:1.08; letter-spacing:-.01em; text-wrap:balance; margin:22px 0 12px}
+.lead{font-size:18px; color:var(--ink-soft); margin:0; max-width:34em}
+.eyebrow{font:600 12px var(--f-mono); text-transform:uppercase; letter-spacing:.08em; color:var(--ink-soft); margin:26px 0 10px}
+.scenes{list-style:none; padding:0; margin:0 0 26px; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px 16px}
+.scenes li{display:grid; grid-template-columns:auto 1fr; column-gap:8px; line-height:1.25; min-width:0}
+.scenes .n{grid-row:span 2; font:600 12px var(--f-mono); color:var(--pen); padding-top:3px}
+.scenes b{font-weight:600; font-size:15px}
+.scenes span:last-child{font-size:13px; color:var(--ink-soft)}
+
+.sheet{background:var(--sheet); border:1px solid var(--line); border-radius:6px; padding:22px 20px; box-shadow:0 12px 30px -20px var(--shadow)}
+.label{display:block; font:600 15px var(--f-body); margin:0 0 8px; padding:0}
+.label i{font-style:normal; font-weight:400; color:var(--ink-soft); font-size:13px; margin-left:4px}
+.text-in{width:100%; font:500 18px var(--f-body); padding:12px 14px; border:1.5px solid var(--line); border-radius:8px; background:var(--sheet); color:var(--ink)}
+.text-in:focus{border-color:var(--pen); outline:none}
+.text-in::placeholder{color:var(--ink-soft); opacity:.7}
+fieldset{border:0; padding:0; margin:20px 0 0; min-width:0}
+.grades{display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); gap:6px}
+.grades button{appearance:none; height:48px; border:1.5px solid var(--line); border-radius:8px; background:var(--sheet); color:var(--ink); font:600 16px var(--f-display); cursor:pointer; padding:0}
+.grades button[aria-pressed="true"]{background:var(--pen); border-color:var(--pen); color:var(--sheet)}
+
+.btn{appearance:none; border:0; border-radius:10px; font:600 17px var(--f-body); padding:14px 20px; min-height:52px; cursor:pointer; text-align:center; text-decoration:none; display:inline-flex; align-items:center; justify-content:center; gap:8px; transition:transform .12s ease, opacity .15s}
+.btn:active{transform:translateY(1px)}
+.btn-primary{background:var(--ink); color:var(--sheet)}
+.btn-primary:disabled{opacity:.38; cursor:not-allowed; transform:none}
+.btn-ghost{background:transparent; color:var(--ink-soft); border:1.5px solid var(--line)}
+.btn-wide{width:100%}
+#startBtn{margin-top:22px}
+.hint{min-height:1.4em; margin:10px 0 0; font-size:14px; color:var(--red)}
+.hint--soft{color:var(--ink-soft); text-align:center}
+.fineprint{font-size:13px; color:var(--ink-soft); margin:16px 0 0; line-height:1.45}
+.center{text-align:center}
+
+/* quiz */
+.qhead{display:flex; align-items:center; gap:14px; margin:18px 0 14px}
+.count{font:600 13px var(--f-mono); white-space:nowrap}
+.count span{color:var(--ink-soft); font-weight:400}
+.bar{flex:1; display:grid; grid-template-columns:repeat(10,1fr); gap:4px}
+.bar span{height:6px; border-radius:2px; background:var(--line)}
+.bar .done{background:var(--ink)}
+.bar .now{background:var(--pen)}
+.scene{font:600 12px var(--f-mono); text-transform:uppercase; letter-spacing:.1em; color:var(--pen)}
+.qtext{font:600 21px/1.35 var(--f-body); margin:8px 0 0; text-wrap:pretty}
+
+.card{margin-top:18px; padding:14px 16px; border-radius:6px; font-size:15px; position:relative}
+.card-title{font:600 12px var(--f-mono); text-transform:uppercase; letter-spacing:.08em; margin-bottom:8px}
+.card dl{margin:0; display:grid; gap:5px}
+.row{display:flex; align-items:baseline}
+.row dt{flex:1; display:flex; align-items:baseline; min-width:0}
+.row dt::after{content:""; flex:1 0 14px; border-bottom:1.5px dotted currentColor; opacity:.35; margin:0 8px; transform:translateY(-.3em)}
+.row dd{margin:0; font-family:var(--f-mono); font-weight:600; white-space:nowrap}
+mark.q{background:var(--marker); color:var(--marker-ink); padding:0 .5em; border-radius:3px}
+.card--ticket{background:var(--pen-soft); color:var(--ink); padding-inline:26px; border-radius:8px;
+  -webkit-mask:radial-gradient(circle 10px at 0 50%,#0000 98%,#000) left/51% 100% no-repeat,radial-gradient(circle 10px at 100% 50%,#0000 98%,#000) right/51% 100% no-repeat;
+  mask:radial-gradient(circle 10px at 0 50%,#0000 98%,#000) left/51% 100% no-repeat,radial-gradient(circle 10px at 100% 50%,#0000 98%,#000) right/51% 100% no-repeat}
+.card--ticket .card-title{color:var(--pen)}
+.card--plain{background:var(--paper); border:1px solid var(--line)}
+.fig{display:block; width:100%; max-width:320px; margin:18px auto 0; height:auto}
+
+.opts{display:grid; gap:10px; margin-top:20px}
+.opt{appearance:none; display:flex; align-items:center; gap:12px; width:100%; text-align:left; padding:13px 14px; border:1.5px solid var(--line); border-radius:10px; background:var(--sheet); color:var(--ink); font:500 17px var(--f-body); cursor:pointer}
+.opt .letter{flex:none; width:30px; height:30px; display:grid; place-items:center; border:1.5px solid var(--ink-soft); border-radius:50%; font:600 14px var(--f-mono); color:var(--ink-soft)}
+.opt[aria-pressed="true"]{border-color:var(--pen); background:var(--pen-soft)}
+.opt[aria-pressed="true"] .letter{background:var(--pen); border-color:var(--pen); color:var(--sheet)}
+
+.num-label{display:block; margin-top:22px; font:600 12px var(--f-mono); letter-spacing:.08em; text-transform:uppercase; color:var(--ink-soft)}
+.num{display:flex; align-items:baseline; gap:10px; margin-top:4px; border-bottom:2px solid var(--ink); padding-bottom:2px}
+.num:focus-within{border-color:var(--pen)}
+.num input{flex:1; min-width:0; border:0; background:transparent; font:600 30px var(--f-mono); color:var(--pen); padding:4px 0; outline:none}
+.num input::placeholder{color:var(--ink-soft); opacity:.45; font-weight:400}
+.num .unit{font:500 18px var(--f-body); color:var(--ink-soft); white-space:nowrap}
+.sign{appearance:none; flex:none; align-self:center; border:1.5px solid var(--line); background:var(--sheet); color:var(--ink); border-radius:8px; font:600 16px var(--f-mono); padding:8px 10px; cursor:pointer}
+.actions{display:flex; flex-wrap:wrap; gap:10px; margin-top:12px}
+.actions .btn-primary{flex:1 1 60%}
+.actions .btn-ghost{flex:0 0 auto}
+
+/* result */
+.res-title{font:700 clamp(24px,6.6vw,34px)/1.12 var(--f-display); text-wrap:balance; margin:22px 0 6px}
+.res-sub{color:var(--ink-soft); margin:0 0 22px}
+.receipt-shadow{max-width:360px; margin:0 auto 34px; filter:drop-shadow(0 0 1px var(--receipt-faint)) drop-shadow(0 12px 16px var(--shadow))}
+.receipt-clip{padding-bottom:8px; animation:print 1.3s cubic-bezier(.25,.8,.25,1) both}
+.receipt{position:relative; background:var(--receipt); color:var(--receipt-ink); font:400 13px/1.65 var(--f-mono); padding:18px 18px 12px; font-variant-numeric:tabular-nums}
+.zz::after{content:""; position:absolute; left:0; right:0; top:100%; height:7px; background:var(--receipt);
+  -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='7'%3E%3Cpath d='M0 0h12L6 7z'/%3E%3C/svg%3E") 0 0/12px 7px repeat-x;
+  mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='7'%3E%3Cpath d='M0 0h12L6 7z'/%3E%3C/svg%3E") 0 0/12px 7px repeat-x}
+.r-center{text-align:center}
+.r-brand{font:700 18px var(--f-display); letter-spacing:.14em}
+.r-sep{border-top:1px dashed var(--receipt-faint); margin:10px 0}
+.r-meta{display:flex; justify-content:space-between; gap:4px 12px; flex-wrap:wrap}
+.r-items{list-style:none; margin:0; padding:0; display:grid; gap:2px}
+.r-items li{display:flex; align-items:baseline; gap:8px}
+.r-name{min-width:0}
+.r-dots{flex:1; min-width:10px; border-bottom:1.5px dotted var(--receipt-faint); transform:translateY(-4px)}
+.r-g{color:var(--receipt-faint); font-size:11px; white-space:nowrap}
+.r-mark{width:1.2em; text-align:center; font-weight:700}
+.r-mark.ok{color:var(--r-ok)} .r-mark.bad{color:var(--r-bad)} .r-mark.skip{color:var(--receipt-faint)}
+.r-line{display:flex; justify-content:space-between; gap:12px}
+.r-total{display:flex; justify-content:space-between; font-weight:700; font-size:18px; margin:2px 0 4px}
+.r-barcode{display:flex; justify-content:center; height:40px; margin:8px 0 6px; overflow:hidden}
+.r-barcode i{display:block; height:100%; background:var(--receipt-ink)}
+.r-foot{text-align:center; letter-spacing:.06em}
+
+.block-title{font:700 19px/1.25 var(--f-display); margin:0 0 12px; text-wrap:balance}
+.summary p{margin:0 0 10px}
+.summary b{font-weight:600}
+.sub{font:600 12px var(--f-mono); text-transform:uppercase; letter-spacing:.08em; color:var(--ink-soft); margin:18px 0 6px}
+.chips{display:flex; flex-wrap:wrap; gap:8px; margin:0; padding:0; list-style:none}
+.chip{font-size:14px; font-weight:500; padding:6px 12px; border-radius:999px}
+.chip--gap{background:var(--red-soft); color:var(--red)}
+.chip--next{background:var(--pen-soft); color:var(--pen)}
+.note{font-size:14px; color:var(--ink-soft); margin:8px 0 0}
+
+.cta{background:var(--marker); color:var(--marker-ink); border-radius:6px; padding:24px 20px; margin:22px 0}
+.cta h2{font:700 clamp(22px,6vw,28px)/1.15 var(--f-display); margin:0 0 10px; text-wrap:balance}
+.cta p{margin:0 0 14px}
+.cta label{display:block; font:600 12px var(--f-mono); text-transform:uppercase; letter-spacing:.08em; margin-bottom:6px}
+.cta textarea{width:100%; resize:vertical; min-height:9.5em; background:var(--marker-field); color:var(--marker-ink); border:1.5px dashed var(--marker-ink); border-radius:6px; font:400 14px/1.5 var(--f-mono); padding:12px}
+.cta-actions{display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; margin-top:12px}
+.btn-cta{background:var(--marker-ink); color:var(--marker)}
+.btn-cta-alt{background:transparent; color:var(--marker-ink); border:1.5px solid var(--marker-ink)}
+.linkbtn{grid-column:1/-1; appearance:none; background:none; border:0; padding:6px 0; font:600 15px var(--f-body); color:var(--marker-ink); text-decoration:underline; text-underline-offset:3px; cursor:pointer; justify-self:center}
+.cta .status{min-height:1.4em; font-size:14px; font-weight:500; margin:8px 0 0}
+.handles{display:grid; gap:2px; margin:12px 0 0; padding-top:12px; border-top:1px dashed var(--marker-ink); font:600 13px var(--f-mono)}
+.handles span{user-select:all}
+
+.review{padding:4px 20px}
+.rv{border-bottom:1px solid var(--line)}
+.rv:last-child{border-bottom:0}
+.rv summary{list-style:none; display:flex; align-items:center; gap:12px; padding:14px 0; cursor:pointer}
+.rv summary::-webkit-details-marker{display:none}
+.rv summary::after{content:"+"; font:600 18px var(--f-mono); color:var(--ink-soft); width:14px; text-align:center}
+.rv[open] summary::after{content:"−"}
+.rv-n{font:600 12px var(--f-mono); color:var(--ink-soft)}
+.rv-t{flex:1; min-width:0; font-size:15px; line-height:1.3}
+.rv-t b{font-weight:600}
+.rv-t span{color:var(--ink-soft)}
+.rv-m{flex:none; width:26px; height:26px; border-radius:50%; display:grid; place-items:center; font-weight:700; font-size:14px}
+.rv-m.ok{background:var(--ok-soft); color:var(--ok)}
+.rv-m.bad{background:var(--red-soft); color:var(--red)}
+.rv-m.skip{background:var(--line); color:var(--ink-soft)}
+.rv-body{padding:0 0 16px 30px; font-size:15px}
+.rv-body p{margin:0 0 8px}
+.rv-q{color:var(--ink-soft)}
+.rv-a b{font-weight:600}
+.after{display:grid; gap:12px; margin-top:22px}
+
+@keyframes rise{from{transform:translateY(8px); opacity:.4} to{transform:none; opacity:1}}
+.enter{animation:rise .3s ease-out}
+@keyframes print{from{clip-path:inset(0 0 100% 0); transform:translateY(-14px)} to{clip-path:inset(0 0 0 0); transform:none}}
+@media (prefers-reduced-motion: reduce){ .enter,.receipt-clip{animation:none} .btn{transition:none} }
+@media (max-width:370px){ .qtext{font-size:19px} .sheet{padding:20px 16px} .grades button{font-size:14px} .cta-actions{grid-template-columns:1fr} }
+</style>
+
+<div class="wrap">
+  <header class="topbar"><span>@mathterful</span><span>Проверка уровня</span></header>
+
+  <section id="screen-start">
+    <h1 class="display">Математика в&nbsp;жизни</h1>
+    <p class="lead">10 задач, которые правда приходится решать: во сколько лечь спать, когда позвонить бабушке в другой стране, сколько заказать пиццы и как развести сироп. Займёт 10–15 минут. Возьми листок и ручку, калькулятор не&nbsp;понадобится.</p>
+    <p class="eyebrow">Что внутри</p>
+    <ol class="scenes" id="scenes"></ol>
+    <div class="sheet">
+      <label class="label" for="name">Как тебя зовут? <i>необязательно</i></label>
+      <input class="text-in" id="name" type="text" maxlength="30" autocomplete="given-name" placeholder="Имя">
+      <fieldset>
+        <legend class="label">В каком ты классе?</legend>
+        <div class="grades" id="grades">
+          <button type="button" data-grade="3" aria-pressed="false">3</button>
+          <button type="button" data-grade="4" aria-pressed="false">4</button>
+          <button type="button" data-grade="5" aria-pressed="false">5</button>
+          <button type="button" data-grade="6" aria-pressed="false">6</button>
+          <button type="button" data-grade="7" aria-pressed="false">7</button>
+          <button type="button" data-grade="8" aria-pressed="false">8</button>
+          <button type="button" data-grade="9" aria-pressed="false">9+</button>
+        </div>
+      </fieldset>
+      <button type="button" id="startBtn" class="btn btn-primary btn-wide" disabled>Начать проверку</button>
+      <p class="hint hint--soft" id="startHint">Выбери класс, чтобы начать</p>
+    </div>
+    <p class="fineprint">Для родителей: в конце — уровень по классам, список пробелов и разбор каждой задачи.</p>
+  </section>
+
+  <section id="screen-quiz" hidden></section>
+  <section id="screen-result" hidden></section>
+</div>
+
+<script>
+(function(){
+  /* Контакты для записи на урок */
+  var CONFIG = {
+    whatsapp: '972515097499', whatsappLabel: '+972 51-509-7499',
+    telegram: 'mathterful_adminbot'
+  };
+  var S = ' ';
+  var LETTERS = ['А','Б','В','Г'];
+
+  var BATTERY = '<svg class="fig" viewBox="0 0 300 92" role="img" aria-label="В 19:00 заряд 40%, в 19:12 заряд 58%">'+
+    '<rect x="12" y="8" width="112" height="46" rx="7" style="fill:none;stroke:var(--ink);stroke-width:2.5"/>'+
+    '<rect x="125" y="22" width="7" height="18" rx="2" style="fill:var(--ink)"/>'+
+    '<rect x="18" y="14" width="40" height="34" rx="3" style="fill:var(--pen)"/>'+
+    '<text x="68" y="80" text-anchor="middle" style="fill:var(--ink);font:600 14px var(--f-mono)">19:00 · 40%</text>'+
+    '<text x="147" y="37" text-anchor="middle" style="fill:var(--ink-soft);font:600 16px var(--f-mono)">→</text>'+
+    '<rect x="162" y="8" width="112" height="46" rx="7" style="fill:none;stroke:var(--ink);stroke-width:2.5"/>'+
+    '<rect x="275" y="22" width="7" height="18" rx="2" style="fill:var(--ink)"/>'+
+    '<rect x="168" y="14" width="58" height="34" rx="3" style="fill:var(--pen)"/>'+
+    '<text x="218" y="80" text-anchor="middle" style="fill:var(--ink);font:600 14px var(--f-mono)">19:12 · 58%</text></svg>';
+
+  var GAUGE = '<svg class="fig" viewBox="0 0 300 156" role="img" aria-label="Указатель бензина: стрелка на одной четверти">'+
+    '<path d="M50 130 A100 100 0 0 1 250 130" style="fill:none;stroke:var(--ink);stroke-width:3"/>'+
+    '<g style="stroke:var(--ink);stroke-width:3;stroke-linecap:round"><line x1="50" y1="130" x2="64" y2="130"/><line x1="79.3" y1="59.3" x2="89.2" y2="69.2"/><line x1="150" y1="30" x2="150" y2="44"/><line x1="220.7" y1="59.3" x2="210.8" y2="69.2"/><line x1="250" y1="130" x2="236" y2="130"/></g>'+
+    '<g style="fill:var(--ink-soft);font:600 14px var(--f-mono)" text-anchor="middle"><text x="50" y="150">E</text><text x="250" y="150">F</text><text x="66" y="48">¼</text><text x="150" y="20">½</text><text x="234" y="48">¾</text><text x="150" y="112">бак 48 л</text></g>'+
+    '<line x1="150" y1="130" x2="93.4" y2="73.4" style="stroke:var(--red);stroke-width:4;stroke-linecap:round"/>'+
+    '<circle cx="150" cy="130" r="7" style="fill:var(--ink)"/></svg>';
+  var FIG = { battery: BATTERY, gauge: GAUGE };
+
+  var Q = [
+    { scene:'Будильник', topic:'время', skill:'Расчёт времени', grade:3, type:'mc',
+      options:['22:15','21:15','16:15','21:45'], answer:1,
+      text:'Чтобы выспаться, тебе нужно 9 ч 30 мин сна. Вставать завтра в 6:45. Во сколько нужно лечь?',
+      card:{kind:'plain', title:'Будильник', rows:[['Подъём','6:45'],['Нужно спать','9 ч 30 мин'],['Лечь в','?']]},
+      explain:'От 6:45 отсчитываем назад 9 часов, получается 21:45. Ещё 30 минут назад — 21:15. Ответ 16:15 получится, если прибавить время вместо того, чтобы вычесть.' },
+    { scene:'Звонок', topic:'часовые пояса', skill:'Часовые пояса', grade:4, type:'mc',
+      options:['03:00','17:00','10:00','15:00'], answer:1,
+      text:'Бабушка живёт в Нью-Йорке, там на 7 часов меньше, чем у вас. Ты хочешь позвонить ей в 10:00 по её времени. Сколько в этот момент будет у вас?',
+      card:{kind:'ticket', title:'Звонок бабушке', rows:[['Нью-Йорк','−7 ч от вас'],['Звонок','10:00 у бабушки'],['У вас','?']]},
+      explain:'У бабушки на 7 часов меньше, значит у вас на 7 часов больше: 10:00 + 7 ч = 17:00. Ответ 03:00 получится, если вычесть вместо того, чтобы прибавить.' },
+    { scene:'Пицца', topic:'сколько заказать', skill:'Деление и округление', grade:4, type:'num', unit:'шт.', answer:4,
+      text:'Ты заказываешь пиццу на день рождения. Сколько пицц нужно, чтобы всем хватило?',
+      card:{kind:'plain', title:'Заказ в пиццерии', rows:[['Гостей вместе с тобой','13'],['Каждый съест','2 куска'],['В одной пицце','8 кусков']]},
+      explain:'Всего нужно 13 × 2 = 26 кусков. Три пиццы — это 24 куска, двоим не хватит. Значит, нужно 4 пиццы. Здесь округляем вверх: неполную пиццу не закажешь.' },
+    { scene:'Заправка', topic:'дробь от числа', skill:'Дробь от числа', grade:5, type:'num', unit:'л', answer:36, figure:'gauge',
+      text:'Вы с родителями заезжаете на заправку. Сколько литров нужно залить, чтобы бак стал полным?',
+      card:{kind:'plain', title:'Приборная панель', rows:[['Объём бака','48 л'],['Стрелка бензина','на ¼'],['Залить до полного','?']]},
+      explain:'¼ бака — это 48 : 4 = 12 л, столько уже есть. До полного не хватает ¾ бака: 48 − 12 = 36 л. Ответ 12 получится, если найти, сколько бензина в баке, а не сколько долить.' },
+    { scene:'Выпечка', topic:'дроби', skill:'Умножение дробей', grade:5, type:'mc',
+      options:['6/8 стакана','1½ стакана','3/8 стакана','1¼ стакана'], answer:1,
+      text:'Рецепт рассчитан на 12 печений, а ты хочешь испечь 24. Сколько сахара нужно взять?',
+      card:{kind:'plain', title:'Печенье · на 12 штук', rows:[['Мука','2 стакана'],['Сахар','¾ стакана'],['Сливочное масло','100 г'],['Яйцо','1 шт.']]},
+      explain:'Печений в 2 раза больше, значит и сахара в 2 раза больше: ¾ × 2 = 6/4 = 1½ стакана. 6/8 — это всё те же ¾: если умножить и числитель, и знаменатель, дробь не изменится.' },
+    { scene:'Погода', topic:'отрицательные числа', skill:'Отрицательные числа', grade:6, type:'num', unit:'°', answer:-5, neg:true,
+      text:'Днём было +3°. К ночи обещают похолодание на 8°. Какая температура будет ночью?',
+      card:{kind:'ticket', title:'Прогноз погоды', rows:[['Днём','+3°'],['К ночи','холоднее на 8°'],['Ночью','?']]},
+      explain:'От +3 опускаемся на 8 градусов: 3 градуса до нуля и ещё 5 ниже нуля. Ночью будет −5°. Ответ 5° получится, если забыть, что температура перешла через ноль.' },
+    { scene:'Контрольная', topic:'проценты', skill:'Проценты', grade:6, type:'num', unit:'%', answer:85,
+      text:'В контрольной было 40 вопросов, правильных ответов — 34. Какой это результат в процентах?',
+      card:{kind:'plain', title:'Контрольная', rows:[['Всего вопросов','40'],['Правильных ответов','34'],['Результат','?']]},
+      explain:'Один вопрос — это 100 : 40 = 2,5%. 34 × 2,5 = 85%. Или так: 34/40 = 85/100.' },
+    { scene:'Сироп', topic:'пропорции', skill:'Части и пропорции', grade:6, type:'num', unit:'мл', answer:300,
+      text:'Сироп разводят так: 1 часть сиропа на 4 части воды. Ты делаешь кувшин напитка на 1,5 литра. Сколько миллилитров сиропа налить?',
+      card:{kind:'plain', title:'Этикетка на бутылке', rows:[['Разводить','1 : 4 с водой'],['Кувшин','1,5 л']]},
+      explain:'Всего частей 1 + 4 = 5. 1,5 л = 1500 мл. Одна часть — 1500 : 5 = 300 мл. Это сироп, остальные 1200 мл — вода. Ответ 375 получится, если делить на 4 вместо 5.' },
+    { scene:'Оценки', topic:'средний балл', skill:'Среднее значение', grade:7, type:'num', unit:'баллов', answer:87,
+      text:'В триместре четыре контрольные, оценки ставят по 100-балльной шкале. Три уже позади. Сколько баллов нужно получить на четвёртой, чтобы средний балл был ровно 85?',
+      card:{kind:'plain', title:'Дневник · математика', rows:[['Контрольная 1','78'],['Контрольная 2','85'],['Контрольная 3','90'],['Контрольная 4','?']]},
+      explain:'Средний балл 85 за четыре контрольные — это сумма 85 × 4 = 340. Уже набрано 78 + 85 + 90 = 253. Нужно 340 − 253 = 87 баллов.' },
+    { scene:'Зарядка', topic:'скорость', skill:'Скорость изменения', grade:7, type:'mc', figure:'battery',
+      options:['19:40','19:52','20:00','20:12'], answer:0,
+      text:'Телефон стоит на зарядке. Если он и дальше будет заряжаться с той же скоростью, во сколько будет 100%?',
+      explain:'За 12 минут заряд вырос на 18%, это 1,5% в минуту. С 58% до 100% осталось 42%: 42 : 1,5 = 28 минут. 19:12 + 28 мин = 19:40.' }
+  ];
+
+  function $(s){ return document.querySelector(s); }
+  var scr = { start: $('#screen-start'), quiz: $('#screen-quiz'), result: $('#screen-result') };
+  function fresh(keep){
+    return { screen:'start', name: keep ? keep.name : '', grade: keep ? keep.grade : null, idx:0, answers:[], startedAt:0, finishedAt:0, draft:'', sel:null };
+  }
+  var state = fresh();
+
+  function esc(s){ return String(s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+  function pad(n){ return (n < 10 ? '0' : '') + n; }
+  function fmt(n){ return Number(n).toLocaleString('ru-RU', { maximumFractionDigits: 2 }).replace('-', '−'); }
+  function parseNum(raw){
+    var t = String(raw).replace(/[\s ]/g,'').replace(/[−–—]/g,'-').replace(',', '.');
+    var m = t.match(/-?\d+(?:\.\d+)?/);
+    return m ? parseFloat(m[0]) : null;
+  }
+  function plural(n, one, few, many){
+    var a = n % 10, b = n % 100;
+    if (a === 1 && b !== 11) return one;
+    if (a >= 2 && a <= 4 && (b < 12 || b > 14)) return few;
+    return many;
+  }
+
+  /* ---------- start ---------- */
+  function renderStart(){
+    $('#scenes').innerHTML = Q.map(function(q, i){
+      return '<li><span class="n">'+pad(i+1)+'</span><b>'+q.scene+'</b><span>'+q.topic+'</span></li>';
+    }).join('');
+    $('#name').value = state.name;
+    syncGrades();
+  }
+  function syncGrades(){
+    Array.prototype.forEach.call(document.querySelectorAll('#grades button'), function(b){
+      b.setAttribute('aria-pressed', String(+b.dataset.grade === state.grade));
+    });
+    $('#startBtn').disabled = !state.grade;
+    $('#startHint').textContent = state.grade ? '10 задач · примерно 15 минут' : 'Выбери класс, чтобы начать';
+  }
+  $('#grades').addEventListener('click', function(e){
+    var b = e.target.closest('button'); if (!b) return;
+    state.grade = +b.dataset.grade; syncGrades();
+  });
+  $('#name').addEventListener('input', function(e){ state.name = e.target.value; });
+  $('#startBtn').addEventListener('click', function(){
+    if (!state.grade) return;
+    state.name = $('#name').value.trim();
+    state.idx = 0; state.answers = []; state.draft = ''; state.sel = null;
+    state.startedAt = Date.now(); state.finishedAt = 0;
+    go('quiz');
+  });
+
+  /* ---------- quiz ---------- */
+  function cardHTML(c){
+    if (!c) return '';
+    var rows = c.rows.map(function(r){
+      var v = r[1] === '?' ? '<mark class="q">?</mark>' : r[1];
+      return '<div class="row"><dt>'+r[0]+'</dt><dd>'+v+'</dd></div>';
+    }).join('');
+    return '<div class="card card--'+c.kind+'"><div class="card-title">'+c.title+'</div><dl>'+rows+'</dl></div>';
+  }
+
+  function renderQuiz(anim){
+    var q = Q[state.idx];
+    var segs = Q.map(function(_, i){ return '<span class="'+(i < state.idx ? 'done' : (i === state.idx ? 'now' : ''))+'"></span>'; }).join('');
+    var answer;
+    if (q.type === 'num'){
+      answer = '<label class="num-label" for="ans">Ответ</label><div class="num">'+
+        (q.neg ? '<button type="button" class="sign" id="sign" aria-label="Поменять знак плюс или минус">+/−</button>' : '')+
+        '<input id="ans" type="text" inputmode="'+(q.neg ? 'text' : 'decimal')+'" autocomplete="off" enterkeyhint="done" placeholder="число" value="'+esc(state.draft)+'"><span class="unit">'+q.unit+'</span></div>';
+    } else {
+      answer = '<div class="opts" role="group" aria-label="Варианты ответа">'+q.options.map(function(o, i){
+        return '<button type="button" class="opt" data-opt="'+i+'" aria-pressed="'+(state.sel === i)+'"><span class="letter">'+LETTERS[i]+'</span><span>'+o+'</span></button>';
+      }).join('')+'</div>';
+    }
+    scr.quiz.innerHTML =
+      '<div class="qhead"><span class="count">Задача '+(state.idx+1)+'<span> из '+Q.length+'</span></span><div class="bar" aria-hidden="true">'+segs+'</div></div>'+
+      '<article class="sheet'+(anim ? ' enter' : '')+'">'+
+        '<div class="scene">'+pad(state.idx+1)+' · '+q.scene+'</div>'+
+        '<h2 class="qtext">'+q.text+'</h2>'+
+        (q.figure ? FIG[q.figure] : '')+
+        cardHTML(q.card)+
+        answer+
+        '<p class="hint" id="qHint" aria-live="polite"></p>'+
+        '<div class="actions"><button type="button" class="btn btn-primary" id="submit">'+(state.idx === Q.length-1 ? 'Завершить' : 'Ответить')+'</button><button type="button" class="btn btn-ghost" id="skip">Не знаю</button></div>'+
+      '</article>'+
+      '<p class="fineprint center">Правильные ответы и разбор покажем в конце.</p>';
+    var inp = $('#ans');
+    if (inp && window.matchMedia && window.matchMedia('(pointer:fine)').matches){ try { inp.focus({ preventScroll:true }); } catch(e){} }
+  }
+  function hint(t){ var h = $('#qHint'); if (h) h.textContent = t; }
+
+  function submit(skip){
+    var q = Q[state.idx], rec;
+    if (skip){
+      rec = { skipped:true, correct:false, shown:'Не знаю' };
+    } else if (q.type === 'num'){
+      var v = parseNum($('#ans').value);
+      if (v === null){ hint('Впиши число или нажми «Не знаю»'); return; }
+      rec = { value:v, correct: Math.abs(v - q.answer) < 1e-9, shown: fmt(v)+(q.unit === '°' || q.unit === '%' ? '' : S)+q.unit };
+    } else {
+      if (state.sel === null){ hint('Выбери вариант или нажми «Не знаю»'); return; }
+      rec = { value:state.sel, correct: state.sel === q.answer, shown: q.options[state.sel] };
+    }
+    state.answers[state.idx] = rec; state.draft = ''; state.sel = null;
+    if (state.idx < Q.length - 1){ state.idx++; renderQuiz(true); window.scrollTo(0, 0); }
+    else { state.finishedAt = Date.now(); go('result'); }
+  }
+
+  scr.quiz.addEventListener('click', function(e){
+    var opt = e.target.closest('.opt');
+    if (opt){
+      state.sel = +opt.dataset.opt;
+      Array.prototype.forEach.call(scr.quiz.querySelectorAll('.opt'), function(o){ o.setAttribute('aria-pressed', String(+o.dataset.opt === state.sel)); });
+      hint(''); return;
+    }
+    if (e.target.closest('#sign')){
+      var inp = $('#ans'), v = inp.value.trim();
+      inp.value = /^[-−–]/.test(v) ? v.replace(/^[-−–]\s*/, '') : '−' + v;
+      state.draft = inp.value; hint(''); return;
+    }
+    if (e.target.closest('#submit')) submit(false);
+    else if (e.target.closest('#skip')) submit(true);
+  });
+  scr.quiz.addEventListener('input', function(e){ if (e.target.id === 'ans'){ state.draft = e.target.value; hint(''); } });
+  scr.quiz.addEventListener('keydown', function(e){ if (e.target.id === 'ans' && e.key === 'Enter'){ e.preventDefault(); submit(false); } });
+
+  /* ---------- result ---------- */
+  var TOP = 7;
+  function analyse(){
+    var rows = Q.map(function(q, i){ return { q:q, i:i, a: state.answers[i] || { correct:false, skipped:true, shown:'Не знаю' } }; });
+    var ok = function(r){ return r.a.correct; };
+    var score = rows.filter(ok).length;
+    var G = state.grade || 9;
+    var inProg = rows.filter(function(r){ return r.q.grade <= G; });
+    var gaps = inProg.filter(function(r){ return !r.a.correct; });
+    var ahead = rows.filter(function(r){ return r.q.grade > G; });
+    var level = null;
+    for (var g = 3; g <= TOP; g++){
+      var it = rows.filter(function(r){ return r.q.grade <= g; });
+      if (it.filter(ok).length >= 0.75 * it.length) level = g;
+    }
+    var all = level === TOP && score === Q.length;
+    var levelText = level === null ? 'до 3 класса' : (all ? TOP+' класс и выше' : '≈ '+level+' класс');
+    var mins = state.startedAt && state.finishedAt ? Math.max(1, Math.round((state.finishedAt - state.startedAt) / 60000)) : null;
+    return { rows:rows, score:score, G:G, inProg:inProg, inProgOk: inProg.filter(ok).length, gaps:gaps,
+             aheadOk: ahead.filter(ok).length, aheadMiss: ahead.filter(function(r){ return !r.a.correct; }),
+             level:level, all:all, levelText:levelText, mins:mins };
+  }
+
+  function barcode(seed){
+    var s = seed % 233280, h = '';
+    for (var i = 0; i < 54; i++){
+      s = (s * 9301 + 49297) % 233280; var w = 1 + Math.floor(s / 233280 * 3);
+      s = (s * 9301 + 49297) % 233280; var g = 1 + Math.floor(s / 233280 * 2);
+      h += '<i style="width:'+w+'px;margin-right:'+g+'px"></i>';
+    }
+    return h;
+  }
+
+  function renderResult(){
+    var R = analyse();
+    var d = new Date(state.finishedAt || Date.now());
+    var date = d.toLocaleDateString('ru-RU');
+    var time = d.toLocaleTimeString('ru-RU', { hour:'2-digit', minute:'2-digit' });
+    var gradeTxt = R.G === 9 ? '9+' : String(R.G);
+    var gradeOf = R.G === 9 ? '9 класса и старше' : R.G+' класса';
+    var name = state.name ? esc(state.name) : '';
+
+    var items = R.rows.map(function(r){
+      var cls = r.a.correct ? 'ok' : (r.a.skipped ? 'skip' : 'bad');
+      var mark = r.a.correct ? '✓' : (r.a.skipped ? '—' : '✗');
+      var lbl = r.a.correct ? 'решено' : (r.a.skipped ? 'пропущено' : 'ошибка');
+      return '<li><span class="r-name">'+r.q.skill+'</span><span class="r-dots"></span><span class="r-g">'+r.q.grade+S+'кл</span><span class="r-mark '+cls+'" aria-label="'+lbl+'">'+mark+'</span></li>';
+    }).join('');
+
+    var p1 = 'Решено <b>'+R.score+' из '+Q.length+'</b>. ' + (R.level === null
+      ? 'Начать стоит с основ: расчёт времени и простые действия с числами.'
+      : (R.all ? 'Решены все задачи, уровень '+TOP+' класса и выше.' : 'Уверенно решаются задачи примерно на уровне <b>'+R.level+' класса</b>.'));
+    var p2 = 'По программе '+gradeOf+' в тесте '+R.inProg.length+' '+plural(R.inProg.length,'задача','задачи','задач')+', решено '+R.inProgOk+'.'
+      + (R.aheadOk ? ' Сверх программы решено ещё '+R.aheadOk+'.' : '');
+    var p3 = R.gaps.length === 0
+      ? 'Пробелов по программе своего класса нет. На уроках можно брать задачи сложнее и проходить следующие темы заранее.'
+      : (R.gaps.length <= 2
+        ? 'Пробелов немного, но на эти темы опираются следующие. Их лучше закрыть сейчас.'
+        : 'Пробелов несколько. Они будут мешать в новых темах, поэтому начинать стоит с них.');
+
+    var gapsHTML = R.gaps.length
+      ? '<p class="sub">Что подтянуть</p><ul class="chips">'+R.gaps.map(function(r){ return '<li class="chip chip--gap">'+r.q.skill+'</li>'; }).join('')+'</ul>' : '';
+    var nextHTML = R.aheadMiss.length
+      ? '<p class="sub">Следующие темы</p><ul class="chips">'+R.aheadMiss.map(function(r){ return '<li class="chip chip--next">'+r.q.skill+'</li>'; }).join('')+'</ul><p class="note">Это нормально: такие задачи проходят в старших классах.</p>' : '';
+
+    var ctaTitle = R.gaps.length ? 'Закроем пробелы на уроках' : 'Пойдём дальше программы';
+    var ctaText = R.gaps.length
+      ? 'Разберём именно эти темы на понятных задачах, шаг за шагом. Напишите нам, подберём время и формат занятий.'
+      : 'База на месте, можно двигаться быстрее. Напишите нам, подберём время и формат занятий.';
+
+    var msg = [
+      'Здравствуйте! Хотим записаться на уроки математики.',
+      'Прошли проверку «Математика в жизни»: '+R.score+' из '+Q.length+', уровень '+R.levelText+'.',
+      'Ученик: '+(state.name ? state.name+', ' : '')+gradeTxt+' класс.',
+      R.gaps.length ? 'Подтянуть: '+R.gaps.map(function(r){ return r.q.skill.toLowerCase(); }).join(', ')+'.' : 'Пробелов по программе нет, хотим идти дальше.'
+    ].join('\n');
+
+    var review = R.rows.map(function(r){
+      var cls = r.a.correct ? 'ok' : (r.a.skipped ? 'skip' : 'bad');
+      var mark = r.a.correct ? '✓' : (r.a.skipped ? '—' : '✗');
+      var right = r.q.type === 'num' ? fmt(r.q.answer)+(r.q.unit === '°' || r.q.unit === '%' ? '' : S)+r.q.unit : r.q.options[r.q.answer];
+      return '<details class="rv"><summary><span class="rv-n">'+pad(r.i+1)+'</span><span class="rv-t"><b>'+r.q.scene+'</b> <span>· '+r.q.skill.toLowerCase()+'</span></span><span class="rv-m '+cls+'">'+mark+'</span></summary>'+
+        '<div class="rv-body"><p class="rv-q">'+r.q.text+'</p><p class="rv-a">Твой ответ: <b>'+esc(r.a.shown)+'</b><br>Правильный ответ: <b>'+right+'</b></p><p>'+r.q.explain+'</p></div></details>';
+    }).join('');
+
+    scr.result.innerHTML =
+      '<h1 class="res-title">'+(name ? name+', вот' : 'Вот')+' твой чек</h1>'+
+      '<p class="res-sub">Результат проверки, пробелы и разбор каждой задачи.</p>'+
+      '<div class="receipt-shadow"><div class="receipt-clip"><div class="receipt zz">'+
+        '<div class="r-center"><div class="r-brand">MATHTERFUL</div><div>ПРОВЕРКА «МАТЕМАТИКА В ЖИЗНИ»</div></div>'+
+        '<div class="r-sep"></div>'+
+        '<div class="r-meta"><span>'+date+' '+time+'</span><span>ЧЕК №'+pad(d.getDate())+pad(d.getMonth()+1)+'</span></div>'+
+        '<div class="r-meta"><span>Ученик: '+(name || '—')+'</span><span>Класс: '+gradeTxt+'</span></div>'+
+        '<div class="r-sep"></div>'+
+        '<ul class="r-items">'+items+'</ul>'+
+        '<div class="r-sep"></div>'+
+        '<div class="r-total"><span>ИТОГО</span><span>'+R.score+' / '+Q.length+'</span></div>'+
+        '<div class="r-line"><span>УРОВЕНЬ</span><span>'+R.levelText+'</span></div>'+
+        (R.mins ? '<div class="r-line"><span>ВРЕМЯ</span><span>'+R.mins+' мин</span></div>' : '')+
+        '<div class="r-sep"></div>'+
+        '<div class="r-barcode" aria-hidden="true">'+barcode(R.score * 97 + R.G * 13 + d.getDate())+'</div>'+
+        '<div class="r-foot">СПАСИБО! ЖДЁМ НА УРОКЕ</div>'+
+      '</div></div></div>'+
+      '<div class="sheet summary"><h2 class="block-title">Что это значит</h2><p>'+p1+'</p><p>'+p2+'</p><p>'+p3+'</p>'+gapsHTML+nextHTML+'</div>'+
+      '<div class="cta"><h2>'+ctaTitle+'</h2><p>'+ctaText+'</p>'+
+        '<label for="msg">Сообщение с результатом</label><textarea id="msg" readonly rows="6"></textarea>'+
+        '<div class="cta-actions">'+
+          '<a class="btn btn-cta" id="wa" href="https://wa.me/'+CONFIG.whatsapp+'" target="_blank" rel="noopener">WhatsApp</a>'+
+          '<a class="btn btn-cta-alt" id="tg" href="https://t.me/'+CONFIG.telegram+'" target="_blank" rel="noopener">Telegram</a>'+
+          '<button type="button" class="linkbtn" id="copy">Скопировать сообщение</button>'+
+        '</div>'+
+        '<p class="status" id="copyStatus" aria-live="polite">В WhatsApp текст подставится сам. Для Telegram он скопируется, останется вставить его в чат.</p>'+
+        '<div class="handles"><span>WhatsApp: '+CONFIG.whatsappLabel+'</span><span>Telegram: @'+CONFIG.telegram+'</span></div>'+
+      '</div>'+
+      '<div class="sheet review"><h2 class="block-title" style="margin:16px 0 4px">Разбор задач</h2>'+review+'</div>'+
+      '<div class="after"><button type="button" class="btn btn-ghost btn-wide" id="again">Пройти ещё раз</button>'+
+      '<p class="fineprint center">Это быстрая проверка из 10 задач. Классы указаны примерно: программы в разных странах отличаются. Точную картину покажет первый урок.</p></div>';
+
+    $('#msg').value = msg;
+    $('#wa').href = 'https://wa.me/'+CONFIG.whatsapp+'?text='+encodeURIComponent(msg);
+  }
+
+  function setStatus(t){ var s = $('#copyStatus'); if (s) s.textContent = t; }
+  function copyMsg(){
+    var ta = $('#msg'); if (!ta) return;
+    var text = ta.value;
+    function fallback(){
+      var ok = false;
+      try { ta.focus(); ta.select(); ok = document.execCommand('copy'); } catch(e){}
+      setStatus(ok ? 'Сообщение скопировано. Вставьте его в чат.' : 'Текст выделен, скопируйте его вручную.');
+    }
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText){
+        navigator.clipboard.writeText(text).then(function(){ setStatus('Сообщение скопировано. Вставьте его в чат.'); }, fallback);
+        return;
+      }
+    } catch(e){}
+    fallback();
+  }
+  scr.result.addEventListener('click', function(e){
+    if (e.target.closest('#tg') || e.target.closest('#copy')) copyMsg();
+    else if (e.target.closest('#again')){ state = fresh(state); go('start'); }
+  });
+
+  /* ---------- navigation ---------- */
+  function go(name){
+    state.screen = name;
+    for (var k in scr) scr[k].hidden = (k !== name);
+    if (name === 'start') renderStart();
+    if (name === 'quiz') renderQuiz(true);
+    if (name === 'result') renderResult();
+    window.scrollTo(0, 0);
+  }
+
+  try { if (window.claude && window.claude.hot && window.claude.hot.snapshot) window.claude.hot.snapshot(function(){ return { state: state }; }); } catch(e){}
+  function boot(data){
+    if (data && data.state && data.state.screen){
+      var s = fresh(); for (var k in data.state) s[k] = data.state[k]; state = s;
+    }
+    go(state.screen);
+  }
+  var hot = window.claude && window.claude.hot;
+  if (hot && hot.ready) hot.ready(boot); else boot((hot && hot.data) || {});
+})();
+</script>
+
+</body></html>
