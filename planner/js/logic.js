@@ -191,7 +191,10 @@ function context(wk) {
   const pr = state.prefs[wk] || { like: [], star: [], nope: [] };
   const like = new Set(pr.like), star = new Set(pr.star), nope = new Set(pr.nope);
   const home = new Set(Object.keys(shopState(wk).hidden));
-  const pref = d => (star.has(d.id) ? 5 : like.has(d.id) ? 3 : 1) * (d.ing.some(i => home.has(i.pid)) ? 1.4 : 1);
+  const rt = state.ratings || {};
+  // Оценки прошлых недель: любимое чаще, «не очень» — реже
+  const learned = d => { const r = rt[d.id]; return r > 0 ? 1 + 0.35 * r : r < 0 ? 0.4 : 1; };
+  const pref = d => (star.has(d.id) ? 5 : like.has(d.id) ? 3 : 1) * (d.ing.some(i => home.has(i.pid)) ? 1.4 : 1) * learned(d);
   const all = state.dishes.filter(d => d.ing.length && !nope.has(d.id));
   return { like, star, nope, home, pref, all, shared: all.filter(d => !isSeafood(d)) };
 }

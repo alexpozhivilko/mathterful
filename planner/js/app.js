@@ -1,6 +1,7 @@
 import { state, save, saveNow, uid, product, allProducts, dish, invalidateProducts, replaceState, resetState } from './store.js';
 import { CATS, CAT_ORDER, MEALS, DISH_EMOJIS, PRODUCT_EMOJI } from './data.js';
 import { parseIngredients, ingredientsToText } from './parse.js';
+import { suggestions, adoptSuggestion, dismissSuggestion, suggestedDish, weekToReview, weekDishes } from './taste.js';
 import {
   WEEKDAYS, WD_SHORT, MONTHS, iso, parseISO, today, addDays, weekKeyOffset, weekDates, fmtDay, fmtRange,
   migrateWeekStart, kcalOf, dishNutr, isSeafood, planOf, covers, forPerson, entryNutr, dayNutr,
@@ -118,7 +119,7 @@ function viewMenu() {
     </div>`;
   }).join('');
 
-  return `${weekNav()}
+  return `${reviewCard()}${weekNav()}
   <section class="card summary glow">
     <h3 class="card-title">В среднем за день</h3>
     <div class="sum-people">${people}</div>
@@ -279,7 +280,82 @@ function viewDishes() {
 
   return `<div class="search big">${I.search}<input data-input="dishSearch" placeholder="Найти блюдо" value="${esc(ui.dishQ)}" autocomplete="off"></div>
   <div class="filters">${filters.map(([k, l]) => `<button class="fchip${ui.dishMeal === k ? ' on' : ''}" data-act="dishMeal" data-m="${k}">${l}</button>`).join('')}</div>
+  ${!q && ui.dishMeal === 'all' ? forYouRow() : ''}
   <div class="dish-grid" id="dish-grid">${dishCards(list)}</div>`;
+}
+
+// ---------- Рекомендации ----------
+let sugCache = { key: '', data: null };
+function cachedSuggestions() {
+  const key = `${state.dishes.length}|${state.dismissed.length}|${JSON.stringify(state.ratings)}|${Object.values(state.prefs).reduce((a, p) => a + p.like.length + p.star.length, 0)}`;
+  if (sugCache.key !== key) sugCache = { key, data: suggestions(6) };
+  return sugCache.data;
+}
+
+function forYouRow() {
+  const { items, learned } = cachedSuggestions();
+  if (!items.length) return '';
+  return `<section class="foryou">
+    <h3 class="group-title"><span>✨</span>${learned ? 'Для вас' : 'Попробуйте новое'}<small>${learned ? 'по вашему вкусу' : 'чем больше выбираете — тем точнее'}</small></h3>
+    <div class="foryou-row">${items.map(({ d, reason }) => {
+      const n = dishNutr(d);
+      return `<button class="fy-card" data-act="openSuggest" data-id="${d.id}">
+        <span class="fy-emoji">${d.emoji}</span><b>${esc(d.name)}</b>
+        <small>${num(n.kcal)} ккал · Б ${r0(n.p)}</small><em>${esc(reason)}</em></button>`;
+    }).join('')}</div></section>`;
+}
+
+// Шторка с рекомендациями: mode — wizard | review | browse
+let sg = null; // { items, status, mode, title, sub }
+function openSuggestSheet(cfg) {
+  sg = { status: {}, ...cfg };
+  openSheet(suggestSheet, 'tall');
+}
+function suggestSheet() {
+  const cards = sg.items.map(({ d, reason }) => {
+    const n = dishNutr(d);
+    const st = sg.status[d.id];
+    return `<article class="sg-card${st ? ' ' + st : ''}" style="--h:${hueOf(d.id)}">
+      <div class="sg-top"><span class="sg-emoji">${d.emoji}</span>
+        <div><em>${esc(reason)}</em><h3>${esc(d.name)}</h3>
+        <div class="tc-kbju"><b>${num(n.kcal)} ккал</b><i class="p">Б ${r0(n.p)}</i><i class="f">Ж ${r0(n.f)}</i><i class="c">У ${r0(n.c)}</i></div></div></div>
+      <div class="sg-tags">${d.meals.map(m => `<span>${mealOf(m).emoji} ${mealOf(m).name}</span>`).join('')}${d.batch ? '<span>🗓 на неск. дней</span>' : ''}${isSeafood(d) ? '<span class="sea">🦐 только мне</span>' : ''}</div>
+      <p class="sg-ing">${esc(d.ing.map(i => { const p = product(i.pid); return p ? `${p.name.toLowerCase()} ${ingQty(p, i.qty)}` : ''; }).filter(Boolean).join(' · '))}</p>
+      ${st === 'added' ? `<div class="sg-done c-have">✓ Добавлено в мои блюда${sg.mode === 'wizard' ? ' и в «хочу» на эту неделю' : ''}</div>`
+        : st === 'dismissed' ? '<div class="sg-done muted">Больше не предлагаю</div>'
+        : `<div class="btn-row"><button class="btn ghost grow" data-act="sgDismiss" data-id="${d.id}">Не интересно</button>
+           <button class="btn primary grow" data-act="sgAdd" data-id="${d.id}">${I.plus}<span>${sg.mode === 'wizard' ? 'Хочу' : 'Добавить'}</span></button></div>`}
+    </article>`;
+  }).join('');
+  return `<div class="sheet-title"><small>${esc(sg.sub)}</small><h2>${esc(sg.title)}</h2></div>
+    ${cards || '<p class="hint center">Пока нечего предложить — вы уже добавили все рецепты из библиотеки 🙂</p>'}
+    <div class="btn-col"><button class="btn ${sg.mode === 'wizard' ? 'primary' : 'ghost'} wide" data-act="sgDone">${sg.mode === 'wizard' ? `Дальше${I.right}` : 'Готово'}</button></div>`;
+}
+
+// Карточка «Как прошла неделя?»
+function reviewCard() {
+  if (ui.weekOffset !== 0) return '';
+  const wk = weekToReview();
+  if (!wk) return '';
+  return `<section class="card review glow">
+    <div class="rv-emoji">🍽</div>
+    <div class="rv-text"><b>Как прошла неделя ${fmtRange(wk)}?</b><small>Отметьте, что понравилось, — подберу похожие рецепты и буду чаще ставить любимое.</small></div>
+    <div class="rv-btns"><button class="btn primary small" data-act="reviewOpen" data-wk="${wk}">Оценить</button>
+    <button class="icon-btn soft" data-act="reviewSkip" data-wk="${wk}" aria-label="Пропустить">${I.x}</button></div>
+  </section>`;
+}
+
+let rv = null; // { wk, r }
+function openReview(wk) {
+  rv = { wk, r: {} };
+  weekDishes(wk).forEach(d => { if (state.ratings[d.id]) rv.r[d.id] = state.ratings[d.id]; });
+  openSheet(() => `<div class="sheet-title"><small>${fmtRange(rv.wk)}</small><h2>Что понравилось?</h2></div>
+    <p class="hint">❤️ — самое любимое, 👍 — вкусно, 👎 — не очень. Можно отметить не всё.</p>
+    <div class="card list">${weekDishes(rv.wk).map(d => `<div class="item static rv-item">
+      <span class="ing-cat">${d.emoji}</span><div class="item-main"><div class="item-name">${esc(d.name)}</div></div>
+      <div class="rate">${[[2, '❤️'], [1, '👍'], [-1, '👎']].map(([v, e]) => `<button class="${rv.r[d.id] === v ? 'on' : ''}" data-act="rvRate" data-id="${d.id}" data-v="${v}">${e}</button>`).join('')}</div>
+    </div>`).join('')}</div>
+    <div class="btn-col"><button class="btn primary wide" data-act="reviewSave">${I.check}<span>Готово — подобрать похожее</span></button></div>`, 'tall');
 }
 
 function dishCards(list) {
@@ -464,7 +540,9 @@ function removeDish(id) {
   }
   for (const pr of Object.values(state.prefs || {})) for (const k of ['like', 'star', 'nope']) pr[k] = pr[k].filter(x => x !== id);
   state.dishes.splice(idx, 1);
+  if (!state.dismissed.includes(id)) state.dismissed.push(id);
   return () => {
+    state.dismissed = state.dismissed.filter(x => x !== id);
     state.dishes.splice(Math.min(idx, state.dishes.length), 0, d);
     for (const [wk, list] of Object.entries(entries)) if (list.length) (state.plans[wk] ||= []).push(...list);
   };
@@ -631,6 +709,7 @@ function openDish(id) {
       </div>
       <p class="hint center">На мою порцию · порция ${esc(names().him.toLowerCase())}а ×${String(f).replace('.', ',')} ≈ ${num(n.kcal * f)} ккал</p>
       ${d.note ? `<div class="note">📝 ${esc(d.note)}</div>` : ''}
+      <div class="rate-row"><span>Ваша оценка</span><div class="rate">${[[2, '❤️'], [1, '👍'], [-1, '👎']].map(([v, e]) => `<button class="${state.ratings[d.id] === v ? 'on' : ''}" data-act="rateDish" data-id="${d.id}" data-v="${v}">${e}</button>`).join('')}</div></div>
       <h4 class="list-h">Ингредиенты на порцию</h4>
       <div class="card list">${d.ing.map(i => {
         const p = product(i.pid);
@@ -1091,11 +1170,64 @@ function wzDone() {
 
 // ---------- Действия ----------
 const A = {
+  // рекомендации и оценки
+  openSuggest(el) {
+    const it = cachedSuggestions().items.find(x => x.d.id === el.dataset.id);
+    if (it) openSuggestSheet({ items: [it], mode: 'browse', title: 'Рецепт для вас', sub: '✨ Рекомендация' });
+  },
+  sgAdd(el) {
+    const id = el.dataset.id;
+    adoptSuggestion(id);
+    if (sg.mode === 'wizard' && wz) { const pr = prefsOf(wz.wk); if (!pr.like.includes(id)) pr.like.push(id); }
+    sg.status[id] = 'added'; buzz(); save(); refreshSheet();
+    if (!wz) render();
+  },
+  sgDismiss(el) { dismissSuggestion(el.dataset.id); sg.status[el.dataset.id] = 'dismissed'; save(); refreshSheet(); if (!wz) render(); },
+  sgDone() {
+    const mode = sg.mode;
+    closeSheet();
+    if (mode === 'wizard' && wz) A.wzNext();
+    else render();
+  },
+  reviewOpen(el) { openReview(el.dataset.wk); },
+  reviewSkip(el) { state.reviewed[el.dataset.wk] = true; update(); },
+  rvRate(el) {
+    const id = el.dataset.id, v = Number(el.dataset.v);
+    if (rv.r[id] === v) delete rv.r[id]; else rv.r[id] = v;
+    buzz(); refreshSheet();
+  },
+  reviewSave() {
+    for (const d of weekDishes(rv.wk)) {
+      if (rv.r[d.id]) state.ratings[d.id] = rv.r[d.id]; else delete state.ratings[d.id];
+    }
+    state.reviewed[rv.wk] = true;
+    const liked = Object.values(rv.r).filter(v => v > 0).length;
+    save(); closeSheet(); render();
+    const { items } = suggestions(3);
+    setTimeout(() => {
+      if (liked && items.length) openSuggestSheet({ items, mode: 'review', title: 'Похожее на то, что понравилось', sub: 'Спасибо за оценки! Учту их в следующих меню' });
+      else toast('Спасибо! Учту в следующих меню');
+    }, 340);
+  },
+  rateDish(el) {
+    const id = el.dataset.id, v = Number(el.dataset.v);
+    if (state.ratings[id] === v) delete state.ratings[id]; else state.ratings[id] = v;
+    buzz(); save(); refreshSheet();
+  },
+
   // мастер планирования
   wzClose: closeWizard,
   wzBack() { if (wz.step > 0) { wz.step--; renderWizard(); } },
   wzNext() {
     if (wz.step >= 3) return;
+    if (wz.step === 0 && !wz.suggested) {
+      wz.suggested = true;
+      const { items, learned } = suggestions(3);
+      if (learned && items.length) {
+        openSuggestSheet({ items, mode: 'wizard', title: 'Новые рецепты для вас', sub: 'Подобрал по тому, что вы выбираете' });
+        return;
+      }
+    }
     if (wz.step === 0) {
       const sig = JSON.stringify(prefsOf(wz.wk));
       if (!wz.draft || wz.sig !== sig) { wz.draft = buildPlan(wz.wk); wz.sig = sig; }
