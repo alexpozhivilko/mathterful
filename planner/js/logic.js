@@ -168,8 +168,20 @@ function myGoal() {
   return { kcal: kcalOf(g), p: g.p, f: g.f, c: g.c };
 }
 
-function weightedPick(list, used) {
-  const w = list.map(d => 1 / (1 + 3 * (used.get(d.id) || 0)));
+// Выбор из «тиндера блюд» и то, что уже есть дома
+export const prefsOf = wk => (state.prefs[wk] ||= { like: [], star: [], nope: [] });
+
+function context(wk) {
+  const pr = state.prefs[wk] || { like: [], star: [], nope: [] };
+  const like = new Set(pr.like), star = new Set(pr.star), nope = new Set(pr.nope);
+  const home = new Set(Object.keys(shopState(wk).hidden));
+  const pref = d => (star.has(d.id) ? 5 : like.has(d.id) ? 3 : 1) * (d.ing.some(i => home.has(i.pid)) ? 1.4 : 1);
+  const all = state.dishes.filter(d => d.ing.length && !nope.has(d.id));
+  return { like, star, nope, home, pref, all, shared: all.filter(d => !isSeafood(d)) };
+}
+
+function weightedPick(list, used, pref = () => 1) {
+  const w = list.map(d => pref(d) / (1 + 3 * (used.get(d.id) || 0)));
   let r = Math.random() * w.reduce((a, b) => a + b, 0);
   for (let i = 0; i < list.length; i++) { r -= w[i]; if (r <= 0) return list[i]; }
   return list[list.length - 1];
@@ -181,10 +193,9 @@ function usedCounts(plan) {
   return used;
 }
 
-const pool = () => state.dishes.filter(d => !isSeafood(d) && d.ing.length);
-const mk = (day, meal, d, span = 1) => ({ id: uid(), day, meal, dishId: d.id, who: 'both', span, mult: 1 });
+const mk = (day, meal, d, span = 1, who = 'both') => ({ id: uid(), day, meal, dishId: d.id, who, span, mult: 1 });
 
-function generateDay(plan, day, dishes, used) {
+function generateDay(plan, day, dishes, used, ctx) {
   const covered = new Set(plan.filter(e => covers(e, day)).map(e => e.meal));
   const base = { kcal: 0, p: 0, f: 0, c: 0 };
   plan.filter(e => covers(e, day) && forPerson(e, 'me')).forEach(e => {
@@ -194,33 +205,37 @@ function generateDay(plan, day, dishes, used) {
   const cand = {};
   for (const m of need) cand[m] = dishes.filter(d => d.meals.includes(m));
   const G = myGoal();
+  const w = d => ctx.pref(d) / (1 + 2 * (used.get(d.id) || 0));
   let best = null, bestScore = Infinity;
 
-  for (let t = 0; t < 400; t++) {
+  for (let t = 0; t < 500; t++) {
     const picks = [];
     for (const m of need) {
       const list = cand[m];
       if (!list.length) continue;
       const count = m === 's' ? (Math.random() < 0.45 ? 2 : 1) : 1;
       for (let k = 0; k < count; k++) {
-        const d = list[rand(list.length)];
+        const d = weightedPick(list, used, w);
         if (picks.some(p => p.d.id === d.id)) continue;
         picks.push({ m, d });
       }
     }
     const n = { ...base };
-    let repeat = 0;
+    let repeat = 0, liked = 0;
     for (const { d } of picks) {
       const x = dishNutr(d);
       n.kcal += x.kcal; n.p += x.p; n.f += x.f;
       repeat += used.get(d.id) || 0;
+      liked += ctx.pref(d) - 1;
+      if (ctx.star.has(d.id) && !used.get(d.id)) liked += 2;
     }
     const score =
       1.2 * Math.abs(n.kcal - G.kcal) / G.kcal +
       Math.max(0, G.p - n.p) / G.p +
       0.25 * Math.max(0, n.p - G.p * 1.35) / G.p +
       0.3 * Math.abs(n.f - G.f) / G.f +
-      0.22 * repeat;
+      0.22 * repeat -
+      0.08 * liked;
     if (score < bestScore) { bestScore = score; best = picks; }
   }
   for (const { m, d } of best || []) {
@@ -230,7 +245,8 @@ function generateDay(plan, day, dishes, used) {
 }
 
 export function autoplanWeek(wk) {
-  const dishes = pool();
+  const ctx = context(wk);
+  const dishes = ctx.shared;
   const plan = [];
   const used = new Map();
   const batchLunch = dishes.filter(d => d.batch && d.meals.includes('l'));
@@ -240,25 +256,63 @@ export function autoplanWeek(wk) {
     const useBatch = batchLunch.length && (Math.random() < 0.7 || !lunch.length);
     if (useBatch && day < 6) {
       const span = Math.min(Math.random() < 0.25 ? 3 : 2, 7 - day);
-      const d = weightedPick(batchLunch, used);
+      const d = weightedPick(batchLunch, used, ctx.pref);
       plan.push(mk(day, 'l', d, span));
       used.set(d.id, (used.get(d.id) || 0) + 1);
       day += span;
     } else if (lunch.length) {
-      const d = weightedPick(lunch, used);
+      const d = weightedPick(lunch, used, ctx.pref);
       plan.push(mk(day, 'l', d));
       used.set(d.id, (used.get(d.id) || 0) + 1);
       day += 1;
     } else break;
   }
-  for (let d = 0; d < 7; d++) generateDay(plan, d, dishes, used);
+  for (let d = 0; d < 7; d++) generateDay(plan, d, dishes, used, ctx);
+
+  // «Обязательные» блюда, которые не попали в меню, ставим вместо подходящих
+  const free = () => plan.filter(e => e.span === 1 && e.who === 'both' && !ctx.star.has(e.dishId));
+  for (const id of ctx.star) {
+    const d = dish(id);
+    if (!d || isSeafood(d) || plan.some(e => e.dishId === id)) continue;
+    const slots = free().filter(e => d.meals.includes(e.meal));
+    if (slots.length) slots[rand(slots.length)].dishId = id;
+  }
+
+  // Блюда с морепродуктами, которые понравились: мне — оно, мужу — другое блюдо в тот же приём пищи
+  const sea = ctx.all.filter(d => isSeafood(d) && (ctx.star.has(d.id) || ctx.like.has(d.id)))
+    .sort((a, b) => ctx.pref(b) - ctx.pref(a)).slice(0, 2);
+  for (const d of sea) {
+    const slots = free().filter(e => d.meals.includes(e.meal) && (e.meal === 'l' || e.meal === 'd') &&
+      !plan.some(x => x.day === e.day && x.who === 'me'));
+    if (!slots.length) continue;
+    const e = slots[rand(slots.length)];
+    e.who = 'him';
+    plan.push(mk(e.day, e.meal, d, 1, 'me'));
+  }
   state.plans[wk] = plan;
 }
 
 export function shuffleDay(wk, day) {
   const plan = planOf(wk).filter(e => !(e.day === day && e.span === 1));
-  generateDay(plan, day, pool(), usedCounts(plan));
+  const ctx = context(wk);
+  generateDay(plan, day, ctx.shared, usedCounts(plan), ctx);
   state.plans[wk] = plan;
+}
+
+// Продукты, нужные для выбранных в «тиндере» блюд
+export function wizardNeeds(wk) {
+  const ctx = context(wk);
+  const chosen = state.dishes.filter(d => ctx.like.has(d.id) || ctx.star.has(d.id));
+  const src = chosen.length ? chosen : ctx.all;
+  const pantry = new Map(), fresh = new Map();
+  for (const d of src) for (const i of d.ing) {
+    const pr = product(i.pid);
+    if (!pr) continue;
+    const m = state.pantry[pr.id] ? pantry : fresh;
+    if (!m.has(pr.id)) m.set(pr.id, { p: pr, dishes: [] });
+    m.get(pr.id).dishes.push(d.name);
+  }
+  return { chosen: chosen.length, pantry: [...pantry.values()], fresh: [...fresh.values()] };
 }
 
 // ---------- Траты ----------

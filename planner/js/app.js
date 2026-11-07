@@ -3,7 +3,7 @@ import { CATS, CAT_ORDER, MEALS, DISH_EMOJIS, PRODUCT_EMOJI } from './data.js';
 import {
   WEEKDAYS, WD_SHORT, MONTHS, iso, parseISO, today, addDays, weekKeyOffset, weekDates, fmtDay, fmtRange,
   migrateWeekStart, kcalOf, dishNutr, isSeafood, planOf, covers, forPerson, entryNutr, dayNutr,
-  shopState, shoppingList, fmtQty, autoplanWeek, shuffleDay, money, expensesByWeek, monthTotal,
+  shopState, shoppingList, fmtQty, autoplanWeek, shuffleDay, money, expensesByWeek, monthTotal, prefsOf, wizardNeeds,
 } from './logic.js';
 
 // ---------- Иконки ----------
@@ -121,7 +121,7 @@ function viewMenu() {
     <h3 class="card-title">В среднем за день</h3>
     <div class="sum-people">${people}</div>
     <div class="sum-actions">
-      <button class="btn primary grow" data-act="autoplan">${I.spark}<span>${plan.length ? 'Пересобрать неделю' : 'Составить неделю за меня'}</span></button>
+      <button class="btn primary grow" data-act="autoplan">${I.spark}<span>${plan.length ? 'Пересобрать неделю' : 'Спланировать неделю'}</span></button>
       ${plan.length ? `<button class="btn ghost square" data-act="clearWeek" aria-label="Очистить неделю">${I.trash}</button>` : ''}
     </div>
   </section>
@@ -193,7 +193,10 @@ function viewShop() {
     <div class="card list">${g.items.map(shopItem).join('')}</div></section>`).join('');
 
   const hidden = L.hidden.length
-    ? `<button class="btn ghost small center" data-act="unhideAll">${I.undo}Вернуть скрытые (${L.hidden.length})</button>` : '';
+    ? `<details class="home-box"><summary><span>🏠</span>Уже есть дома<small>${L.hidden.length}</small></summary>
+      <div class="card list">${L.hidden.map(it => `<div class="item static"><span class="ing-cat">${PRODUCT_EMOJI[it.pid] || CATS[it.cat].emoji}</span>
+        <div class="item-main"><div class="item-name">${esc(it.name)}</div>${it.qtyText ? `<div class="item-sub">нужно ${it.qtyText}</div>` : ''}</div>
+        <button class="btn ghost small" data-act="unhide" data-key="${esc(it.key)}">В список</button></div>`).join('')}</div></details>` : '';
 
   const finish = `<div class="sticky-cta"><button class="btn primary wide" data-act="finishShop">${I.receipt}<span>Покупка завершена — внести чек</span></button></div>`;
 
@@ -213,7 +216,7 @@ function shopItem(it) {
     <span class="check">${I.check}</span>
     <div class="item-main"><div class="item-name">${esc(it.name)}</div>${sub.length ? `<div class="item-sub">${sub.join(' · ')}</div>` : ''}</div>
     ${it.qtyText ? `<div class="item-qty">${it.qtyText}</div>` : ''}
-    <button class="item-x" data-act="hideItem" data-key="${esc(it.key)}" aria-label="Убрать">${I.x}</button>
+    <button class="item-x" data-act="hideItem" data-key="${esc(it.key)}" aria-label="${it.manual ? 'Убрать' : 'Уже есть дома'}">${I.x}</button>
   </div>`;
 }
 
@@ -714,8 +717,270 @@ function openSettings() {
   }, 'tall');
 }
 
+// ---------- Мастер «Планирование недели» ----------
+let wz = null; // { wk, step, deck, i, hist, q, busy }
+const WZ_STEPS = ['Блюда', 'Кладовка', 'Холодильник', 'Готово'];
+const hueOf = id => [...id].reduce((h, ch) => (h * 31 + ch.charCodeAt(0)) % 360, 7);
+const shuffleArr = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+
+function openWizard() {
+  const wk = curWeek();
+  const pr = prefsOf(wk);
+  const decided = new Set([...pr.like, ...pr.star, ...pr.nope]);
+  wz = { wk, step: 0, deck: shuffleArr(state.dishes.filter(d => d.ing.length && !decided.has(d.id)).map(d => d.id)), i: 0, hist: [], q: '', busy: false };
+  const el = document.createElement('div');
+  el.className = 'wizard';
+  el.id = 'wizard';
+  document.body.appendChild(el);
+  document.body.classList.add('noscroll');
+  renderWizard();
+  requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('open')));
+}
+
+function closeWizard() {
+  const el = $('#wizard');
+  wz = null;
+  save();
+  if (!el) return;
+  el.classList.remove('open');
+  document.body.classList.remove('noscroll');
+  setTimeout(() => el.remove(), 350);
+}
+
+function renderWizard(keepScroll = false) {
+  const el = $('#wizard');
+  if (!el || !wz) return;
+  const old = el.querySelector('.wz-body');
+  const st = keepScroll && old ? old.scrollTop : 0;
+  const views = [wzDishes, wzPantry, wzFridge, wzDone];
+  el.innerHTML = `<div class="wz-top">
+      <button class="icon-btn glass" data-act="wzBack" ${wz.step === 0 ? 'style="visibility:hidden"' : ''} aria-label="Назад">${I.left}</button>
+      <div class="wz-steps">${WZ_STEPS.map((s, i) => `<div class="${i < wz.step ? 'done' : i === wz.step ? 'on' : ''}"><i></i><span>${s}</span></div>`).join('')}</div>
+      <button class="icon-btn glass" data-act="wzClose" aria-label="Закрыть">${I.x}</button>
+    </div>
+    <div class="wz-body${wz.step === 0 ? ' fit' : ''}">${views[wz.step]()}</div>`;
+  el.querySelector('.wz-body').scrollTop = st;
+  if (wz.step === 0) bindDeck();
+}
+
+// Шаг 1 — тиндер блюд
+function wzDishes() {
+  const pr = prefsOf(wz.wk);
+  const liked = pr.like.length + pr.star.length;
+  return `<div class="wz-head"><small>Шаг 1 · ${fmtRange(wz.wk)}</small><h2>Что хочется на этой неделе?</h2>
+      <p>Вправо — <b class="c-have">хочу</b>, влево — <b class="c-out">не сейчас</b>, вверх — <b class="c-low">обязательно</b>.</p></div>
+    <div class="deck" id="deck">${deckHTML()}</div>
+    <div class="deck-btns">
+      <button class="round undo" data-act="wzUndo" ${wz.hist.length ? '' : 'disabled'} aria-label="Вернуть">${I.undo}</button>
+      <button class="round nope" data-act="wzSwipe" data-v="nope" aria-label="Не сейчас">${I.x}</button>
+      <button class="round star" data-act="wzSwipe" data-v="star" aria-label="Обязательно">★</button>
+      <button class="round like" data-act="wzSwipe" data-v="like" aria-label="Хочу">♥</button>
+    </div>
+    <div class="wz-foot">
+      <div class="wz-count"><span class="c-have">♥ ${pr.like.length}</span><span class="c-low">★ ${pr.star.length}</span><span class="c-out">✕ ${pr.nope.length}</span></div>
+      <button class="btn primary" data-act="wzNext">${liked ? 'Дальше' : 'Пропустить'}${I.right}</button>
+    </div>`;
+}
+
+function deckHTML() {
+  const left = wz.deck.length - wz.i;
+  if (left <= 0) {
+    const pr = prefsOf(wz.wk);
+    return `<div class="deck-done"><div class="empty-emoji">🎉</div><h3>Все блюда просмотрены</h3>
+      <p>Выбрано ${pr.like.length + pr.star.length} ${plural(pr.like.length + pr.star.length, 'блюдо', 'блюда', 'блюд')}. Можно идти дальше.</p>
+      <button class="btn ghost small" data-act="wzRestart">${I.undo}<span>Пересмотреть заново</span></button></div>`;
+  }
+  const cards = [];
+  for (let k = Math.min(2, left - 1); k >= 0; k--) {
+    const d = dish(wz.deck[wz.i + k]);
+    if (!d) continue;
+    const n = dishNutr(d);
+    cards.push(`<div class="tcard${k === 0 ? ' top' : ''}" data-k="${k}" style="--k:${k};--h:${hueOf(d.id)}">
+      <div class="tc-stamp like">ХОЧУ</div><div class="tc-stamp nope">НЕ СЕЙЧАС</div><div class="tc-stamp star">ОБЯЗАТЕЛЬНО</div>
+      <div class="tc-art"><span>${d.emoji}</span></div>
+      <div class="tc-info">
+        <div class="tc-tags">${d.meals.map(m => `<span>${mealOf(m).emoji} ${mealOf(m).name}</span>`).join('')}${d.batch ? '<span>🗓 на неск. дней</span>' : ''}${isSeafood(d) ? '<span class="sea">🦐 только мне</span>' : ''}</div>
+        <h3>${esc(d.name)}</h3>
+        <div class="tc-kbju"><b>${num(n.kcal)} ккал</b><i class="p">Б ${r0(n.p)}</i><i class="f">Ж ${r0(n.f)}</i><i class="c">У ${r0(n.c)}</i></div>
+        <p class="tc-ing">${esc(d.ing.map(i => product(i.pid)?.name).filter(Boolean).join(' · '))}</p>
+      </div></div>`);
+  }
+  return cards.join('') + `<div class="deck-left">${left} ${plural(left, 'блюдо', 'блюда', 'блюд')}</div>`;
+}
+
+function bindDeck() {
+  const card = $('#deck .tcard.top');
+  if (!card) return;
+  let sx = 0, sy = 0, dx = 0, dy = 0, drag = false;
+  const clamp = v => Math.max(0, Math.min(1, v));
+  card.addEventListener('pointerdown', e => {
+    if (wz.busy) return;
+    drag = true; sx = e.clientX; sy = e.clientY; dx = dy = 0;
+    card.setPointerCapture(e.pointerId);
+    card.classList.add('drag');
+  });
+  card.addEventListener('pointermove', e => {
+    if (!drag) return;
+    dx = e.clientX - sx; dy = e.clientY - sy;
+    card.style.transform = `translate(${dx}px, ${dy}px) rotate(${dx / 16}deg)`;
+    const up = -dy > Math.abs(dx);
+    card.style.setProperty('--like', up ? 0 : clamp(dx / 110));
+    card.style.setProperty('--nope', up ? 0 : clamp(-dx / 110));
+    card.style.setProperty('--star', up ? clamp(-dy / 120) : 0);
+  });
+  const end = () => {
+    if (!drag) return;
+    drag = false;
+    card.classList.remove('drag');
+    if (dx > 110) swipe('like');
+    else if (dx < -110) swipe('nope');
+    else if (-dy > 120 && -dy > Math.abs(dx)) swipe('star');
+    else { card.style.transform = ''; ['--like', '--nope', '--star'].forEach(v => card.style.setProperty(v, 0)); }
+  };
+  card.addEventListener('pointerup', end);
+  card.addEventListener('pointercancel', end);
+}
+
+function swipe(v) {
+  if (!wz || wz.busy || wz.i >= wz.deck.length) return;
+  wz.busy = true;
+  const id = wz.deck[wz.i];
+  prefsOf(wz.wk)[v].push(id);
+  wz.hist.push({ id, v });
+  wz.i++;
+  buzz();
+  const card = $('#deck .tcard.top');
+  if (card) {
+    const x = v === 'like' ? 1 : v === 'nope' ? -1 : 0;
+    card.classList.add('fly');
+    card.style.setProperty(`--${v}`, 1);
+    card.style.transform = `translate(${x * innerWidth * 1.1}px, ${v === 'star' ? -innerHeight : 30}px) rotate(${x * 28}deg)`;
+  }
+  document.querySelectorAll('#deck .tcard:not(.top)').forEach(c => c.style.setProperty('--k', Number(c.dataset.k) - 1));
+  setTimeout(() => { if (!wz) return; wz.busy = false; renderWizard(); save(); }, 260);
+}
+
+// Шаг 2 — кладовка
+function wzPantry() {
+  const { pantry, chosen } = wizardNeeds(wz.wk);
+  const need = pantry.filter(x => state.pantry[x.p.id] !== 'have').length;
+  const items = pantry.sort((a, b) => a.p.name.localeCompare(b.p.name, 'ru'));
+  return `<div class="wz-head"><small>Шаг 2</small><h2>Проверим кладовку</h2>
+      <p>${chosen ? `Для выбранных блюд нужны эти запасы.` : 'Запасы, которые используются в блюдах.'} Нажмите на то, что <b class="c-low">заканчивается</b> или чего <b class="c-out">нет</b> — это попадёт в список покупок.</p></div>
+    ${items.length ? `<div class="pantry-grid">${items.map(({ p, dishes }) => {
+      const st = state.pantry[p.id];
+      return `<button class="jar ${st}" data-act="wzPantryCycle" data-pid="${p.id}">
+        <span class="jar-name">${PRODUCT_EMOJI[p.id] || ''} ${esc(p.name)}</span><span class="jar-st"><i></i>${STATUS[st]}</span>
+        <span class="jar-for">${esc([...new Set(dishes)].slice(0, 2).join(', '))}</span></button>`;
+    }).join('')}</div>` : empty('🫙', 'Запасы не нужны', 'Для выбранных блюд ничего из кладовки не требуется.')}
+    <div class="wz-foot sticky">
+      <div class="wz-count">${need ? `<span class="c-out">купить: ${need}</span>` : '<span class="c-have">всё есть ✓</span>'}</div>
+      <button class="btn primary" data-act="wzNext">Дальше${I.right}</button>
+    </div>`;
+}
+
+// Шаг 3 — холодильник
+function wzFridge() {
+  const { fresh, chosen } = wizardNeeds(wz.wk);
+  const hidden = shopState(wz.wk).hidden;
+  const ids = new Set(fresh.map(x => x.p.id));
+  const extra = Object.keys(hidden).map(id => product(id)).filter(p => p && !ids.has(p.id) && !state.pantry[p.id]);
+  const have = fresh.filter(x => hidden[x.p.id]).length + extra.length;
+  const groups = CAT_ORDER.map(cat => {
+    const items = fresh.filter(x => x.p.cat === cat).sort((a, b) => a.p.name.localeCompare(b.p.name, 'ru'));
+    if (!items.length) return '';
+    return `<h3 class="group-title"><span>${CATS[cat].emoji}</span>${CATS[cat].name}</h3>
+      <div class="fridge-grid">${items.map(({ p }) => fridgeChip(p, !!hidden[p.id])).join('')}</div>`;
+  }).join('');
+  return `<div class="wz-head"><small>Шаг 3</small><h2>Что уже есть в холодильнике?</h2>
+      <p>Отметьте продукты, которых дома хватит на ${chosen ? 'выбранные блюда' : 'неделю'}. Их не будет в списке покупок, а блюда с ними попадут в меню охотнее.</p></div>
+    <div class="add-row wz-search">
+      <div class="search">${I.search}<input id="wz-search" data-input="wzSearch" placeholder="Есть что-то ещё? Например, шпинат" autocomplete="off" value="${esc(wz.q)}"></div>
+      <div class="suggest" id="wz-suggest">${wzSuggest()}</div>
+    </div>
+    ${extra.length ? `<h3 class="group-title"><span>🧊</span>Ещё есть дома</h3><div class="fridge-grid">${extra.map(p => fridgeChip(p, true)).join('')}</div>` : ''}
+    ${groups}
+    <div class="wz-foot sticky">
+      <div class="wz-count"><span class="c-have">🏠 есть дома: ${have}</span></div>
+      <button class="btn primary" data-act="wzNext">Дальше${I.right}</button>
+    </div>`;
+}
+
+function fridgeChip(p, on) {
+  return `<button class="fridge${on ? ' on' : ''}" data-act="wzFridge" data-pid="${p.id}">
+    <span class="fr-emoji">${PRODUCT_EMOJI[p.id] || CATS[p.cat].emoji}</span><span class="fr-name">${esc(p.name)}</span>
+    <span class="fr-check">${I.check}</span></button>`;
+}
+
+function wzSuggest() {
+  const q = wz.q.trim().toLowerCase();
+  if (!q) return '';
+  const hidden = shopState(wz.wk).hidden;
+  return allProducts().filter(p => !state.pantry[p.id] && !hidden[p.id] && p.name.toLowerCase().includes(q)).slice(0, 6)
+    .map(p => `<button class="sug" data-act="wzFridgeAdd" data-pid="${p.id}"><span>${PRODUCT_EMOJI[p.id] || CATS[p.cat].emoji}</span>${esc(p.name)}</button>`).join('');
+}
+
+// Шаг 4 — итог
+function wzDone() {
+  const pr = prefsOf(wz.wk);
+  const { pantry } = wizardNeeds(wz.wk);
+  const buy = pantry.filter(x => state.pantry[x.p.id] !== 'have').length;
+  const home = Object.keys(shopState(wz.wk).hidden).length;
+  const hasPlan = planOf(wz.wk).length > 0;
+  const tile = (emoji, n, label, cls) => `<div class="wz-tile ${cls}"><span>${emoji}</span><b>${n}</b><small>${label}</small></div>`;
+  return `<div class="wz-head center-text"><div class="wz-hero">✨</div><small>Шаг 4 · ${fmtRange(wz.wk)}</small><h2>Всё готово к планированию</h2>
+      <p>Составлю меню на 7 дней под ваши цели по КБЖУ: чаще возьму то, что вы выбрали, и то, что есть дома.</p></div>
+    <div class="wz-tiles">
+      ${tile('♥', pr.like.length, 'хочу', 'like')}${tile('★', pr.star.length, 'обязательно', 'star')}${tile('✕', pr.nope.length, 'не сейчас', 'nope')}
+      ${tile('🫙', buy, 'докупить запасов', 'jar')}${tile('🏠', home, 'есть дома', 'home')}${tile('🍽', state.settings.factor.toFixed(1).replace('.', ','), 'порция мужа ×', 'him')}
+    </div>
+    ${hasPlan ? '<div class="alert">Текущее меню этой недели заменится новым.</div>' : ''}
+    <div class="btn-col"><button class="btn primary wide big" data-act="wzBuild">${I.spark}<span>Составить меню</span></button>
+    <button class="btn ghost wide" data-act="wzResetPrefs">${I.undo}<span>Сбросить выбор блюд</span></button></div>`;
+}
+
 // ---------- Действия ----------
 const A = {
+  // мастер планирования
+  wzClose: closeWizard,
+  wzBack() { if (wz.step > 0) { wz.step--; renderWizard(); } },
+  wzNext() { if (wz.step < 3) { wz.step++; renderWizard(); } },
+  wzSwipe(el) { swipe(el.dataset.v); },
+  wzUndo() {
+    const h = wz.hist.pop();
+    if (!h) return;
+    const pr = prefsOf(wz.wk);
+    pr[h.v] = pr[h.v].filter(x => x !== h.id);
+    wz.i--; renderWizard(); save();
+  },
+  wzRestart() {
+    state.prefs[wz.wk] = { like: [], star: [], nope: [] };
+    wz.deck = shuffleArr(state.dishes.filter(d => d.ing.length).map(d => d.id));
+    wz.i = 0; wz.hist = []; renderWizard(); save();
+  },
+  wzResetPrefs() {
+    state.prefs[wz.wk] = { like: [], star: [], nope: [] };
+    wz.deck = shuffleArr(state.dishes.filter(d => d.ing.length).map(d => d.id));
+    wz.i = 0; wz.hist = []; wz.step = 0; renderWizard(); save();
+  },
+  wzPantryCycle(el) { const p = el.dataset.pid; state.pantry[p] = NEXT[state.pantry[p]]; buzz(); save(); renderWizard(true); },
+  wzFridge(el) {
+    const h = shopState(wz.wk).hidden, p = el.dataset.pid;
+    if (h[p]) delete h[p]; else { h[p] = true; buzz(); }
+    save(); renderWizard(true);
+  },
+  wzFridgeAdd(el) {
+    shopState(wz.wk).hidden[el.dataset.pid] = true;
+    wz.q = ''; save(); renderWizard(true);
+  },
+  wzBuild() {
+    const wk = wz.wk;
+    autoplanWeek(wk);
+    closeWizard();
+    ui.tab = 'menu'; ui.weekOffset = Math.round((parseISO(wk) - parseISO(weekKeyOffset(0))) / (7 * 864e5));
+    save(); saveUI(); render(); window.scrollTo(0, 0);
+    confetti(); toast('Меню на неделю готово ✨');
+  },
   tab(el) {
     if (ui.tab === el.dataset.tab) { window.scrollTo({ top: 0, behavior: 'smooth' }); return; }
     ui.tab = el.dataset.tab; ui.pantryEdit = false;
@@ -729,12 +994,7 @@ const A = {
   confirmOk() { const f = pending.confirm; pending.confirm = null; closeSheet(); f && f(); },
 
   // меню
-  autoplan() {
-    const wk = curWeek();
-    const run = () => { autoplanWeek(wk); buzz(); update(); toast('Готово! Меню на неделю составлено ✨'); };
-    if (planOf(wk).length) confirmSheet('Пересобрать неделю?', 'Текущее меню этой недели заменится новым.', 'Пересобрать', run, false);
-    else run();
-  },
+  autoplan() { openWizard(); },
   clearWeek() {
     confirmSheet('Очистить неделю?', 'Все блюда этой недели будут удалены из меню.', 'Очистить', () => { state.plans[curWeek()] = []; update(); });
   },
@@ -787,10 +1047,10 @@ const A = {
     const k = el.dataset.key;
     if (k.startsWith('m:')) sh.manual = sh.manual.filter(m => 'm:' + m.id !== k);
     else if (state.pantry[k] && state.pantry[k] !== 'have') { state.pantry[k] = 'have'; toast('Отмечено в кладовке как «есть»'); }
-    else sh.hidden[k] = true;
+    else { sh.hidden[k] = true; toast('🏠 Отмечено: уже есть дома'); }
     update();
   },
-  unhideAll() { shopState(curWeek()).hidden = {}; update(); },
+  unhide(el) { delete shopState(curWeek()).hidden[el.dataset.key]; update(); },
   shopAddPid(el) {
     const sh = shopState(curWeek());
     sh.manual.push({ id: uid(), pid: el.dataset.pid, name: '' });
@@ -970,6 +1230,7 @@ const INPUT = {
   np(el) { ed.np[el.dataset.k] = el.value; },
   exp(el) { exp[el.dataset.k] = el.value; },
   pantrySearch(el) { pq = el.value; $('#pantry-list').innerHTML = pantryAddList(); },
+  wzSearch(el) { wz.q = el.value; $('#wz-suggest').innerHTML = wzSuggest(); },
 };
 
 const CHANGE = {
@@ -1011,7 +1272,12 @@ document.addEventListener('keydown', ev => {
     ev.preventDefault();
     A[ev.target.dataset.enter]();
   }
-  if (ev.key === 'Escape') closeSheet();
+  if (ev.key === 'Escape') { if (sheet) closeSheet(); else if (wz) closeWizard(); }
+  if (wz && wz.step === 0 && !sheet) {
+    if (ev.key === 'ArrowRight') swipe('like');
+    if (ev.key === 'ArrowLeft') swipe('nope');
+    if (ev.key === 'ArrowUp') swipe('star');
+  }
 });
 
 // Обновить «сегодня», если приложение долго висело в фоне
