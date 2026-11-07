@@ -1,5 +1,5 @@
 // Офлайн-режим: файлы приложения кешируются, данные живут в localStorage.
-const CACHE = 'kitchen-planner-v3';
+const CACHE = 'kitchen-planner-v4';
 const FILES = [
   './', './index.html', './css/app.css', './manifest.webmanifest',
   './js/app.js', './js/data.js', './js/logic.js', './js/store.js', './js/parse.js',

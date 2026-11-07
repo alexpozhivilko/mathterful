@@ -5,6 +5,7 @@ import {
   WEEKDAYS, WD_SHORT, MONTHS, iso, parseISO, today, addDays, weekKeyOffset, weekDates, fmtDay, fmtRange,
   migrateWeekStart, kcalOf, dishNutr, isSeafood, planOf, covers, forPerson, entryNutr, dayNutr,
   shopState, shoppingList, fmtQty, autoplanWeek, shuffleDay, money, expensesByWeek, monthTotal, prefsOf, wizardNeeds,
+  buildPlan, planNeeds, planAvgKcal, grams,
 } from './logic.js';
 
 // ---------- Иконки ----------
@@ -237,6 +238,7 @@ const NEXT = { have: 'low', low: 'out', out: 'have' };
 
 function viewPantry() {
   const entries = Object.entries(state.pantry).map(([pid, st]) => ({ p: product(pid), st })).filter(x => x.p);
+  const weekNeed = planNeeds(planOf(weekKeyOffset(0)));
   const cnt = { have: 0, low: 0, out: 0 };
   entries.forEach(x => cnt[x.st]++);
   const f = ui.pantryFilter;
@@ -259,6 +261,7 @@ function viewPantry() {
     return `<section class="group"><h3 class="group-title"><span>${CATS[cat].emoji}</span>${CATS[cat].name}</h3>
       <div class="pantry-grid">${items.map(({ p, st }) => `<button class="jar ${st}${ui.pantryEdit ? ' editing' : ''}" data-act="${ui.pantryEdit ? 'pantryRemove' : 'pantryCycle'}" data-pid="${p.id}">
         <span class="jar-name">${esc(p.name)}</span><span class="jar-st"><i></i>${STATUS[st]}</span>
+        ${weekNeed.has(p.id) ? `<span class="jar-need">на этой неделе <b>${fmtQty(p, weekNeed.get(p.id).qty)}</b></span>` : ''}
         ${ui.pantryEdit ? `<span class="jar-x">${I.x}</span>` : ''}</button>`).join('')}</div></section>`;
   }).join('');
 
@@ -533,6 +536,12 @@ function entrySheet() {
       <span class="eh-emoji">${d.emoji}</span>
       <div><small>${mealOf(e.meal).emoji} ${mealOf(e.meal).name} · ${WD_SHORT[date.getDay()]}, ${fmtDay(date)}</small><h2>${esc(d.name)}</h2></div>
     </div>
+    <div class="nutr-pair">
+      ${e.who !== 'him' ? `<div class="np me"><small>${esc(nmz.me)} · порция ${fmtAmt(null, portionWeight(d, e.mult))}</small><b>${num(nm.kcal)} ккал</b><span>Б ${r0(nm.p)} · Ж ${r0(nm.f)} · У ${r0(nm.c)}</span></div>` : ''}
+      ${e.who !== 'me' ? `<div class="np him"><small>${esc(nmz.him)} · порция ${fmtAmt(null, portionWeight(d, e.mult * state.settings.factor))}</small><b>${num(nh.kcal)} ккал</b><span>Б ${r0(nh.p)} · Ж ${r0(nh.f)} · У ${r0(nh.c)}</span></div>` : ''}
+    </div>
+    ${ingTable(d, e)}
+    ${d.note ? `<div class="note">📝 ${esc(d.note)}</div>` : ''}
     <label class="field-label">Для кого</label>
     <div class="seg wide">${[['both', 'Для обоих'], ['me', nmz.me], ['him', nmz.him]].map(([k, l]) => `<button class="${e.who === k ? 'on' : ''}" data-act="draftSet" data-k="who" data-v="${k}">${esc(l)}</button>`).join('')}</div>
     ${sea && e.who !== 'me' ? `<div class="alert">🦐 В этом блюде морепродукты, а ${esc(nmz.him.toLowerCase())} их не ест. Лучше поставить «${esc(nmz.me)}» и добавить ему что-то другое.</div>` : ''}
@@ -545,16 +554,46 @@ function entrySheet() {
       <div class="stepper-val"><b>×${String(e.mult).replace('.', ',')}</b><small>${e.mult === 1 ? 'обычная' : e.mult < 1 ? 'поменьше' : 'побольше'}</small></div>
       <button class="icon-btn soft" data-act="draftMult" data-d="0.25" ${e.mult >= 3 ? 'disabled' : ''}>${I.plus}</button>
     </div>
-    <div class="nutr-pair">
-      ${e.who !== 'him' ? `<div class="np me"><small>${esc(nmz.me)}</small><b>${num(nm.kcal)} ккал</b><span>Б ${r0(nm.p)} · Ж ${r0(nm.f)} · У ${r0(nm.c)}</span></div>` : ''}
-      ${e.who !== 'me' ? `<div class="np him"><small>${esc(nmz.him)} · ×${String(state.settings.factor).replace('.', ',')}</small><b>${num(nh.kcal)} ккал</b><span>Б ${r0(nh.p)} · Ж ${r0(nh.f)} · У ${r0(nh.c)}</span></div>` : ''}
-    </div>
     <div class="btn-col">
       <button class="btn primary wide" data-act="draftSave">${draft.isNew ? `${I.plus}<span>Добавить в меню</span>` : `${I.check}<span>Сохранить</span>`}</button>
       ${draft.isNew
         ? `<button class="btn ghost wide" data-act="draftBack">${I.left}<span>Выбрать другое блюдо</span></button>`
         : `<div class="btn-row"><button class="btn ghost grow" data-act="draftReplace">${I.undo}<span>Заменить</span></button><button class="btn ghost grow" data-act="draftRecipe">${I.edit}<span>Рецепт</span></button><button class="btn danger square" data-act="draftDelete" aria-label="Убрать из меню">${I.trash}</button></div>`}
     </div>`;
+}
+
+
+// ---------- Граммовка ----------
+const dec = (v, k = 1) => String(Math.round(v * 10 ** k) / 10 ** k).replace('.', ',');
+// Количество продукта для показа: граммы округляем до 5, штуки — до десятых
+function fmtAmt(p, q) {
+  if (p && p.unit === 'pcs') return `${dec(q)} ${p.ul || 'шт'}`;
+  const u = p && p.unit === 'ml' ? ['мл', 'л'] : ['г', 'кг'];
+  if (q >= 1000) return `${dec(q / 1000, 2)} ${u[1]}`;
+  if (q < 10) return `${dec(q)} ${u[0]}`;
+  return `${Math.round(q / 5) * 5} ${u[0]}`;
+}
+const portionWeight = (d, k) => d.ing.reduce((a, i) => { const p = product(i.pid); return a + (p ? grams(p, i.qty * k) : 0); }, 0);
+
+function ingTable(d, e) {
+  const f = state.settings.factor;
+  const span = Math.min(e.span, 7 - e.day);
+  const cols = [];
+  if (e.who !== 'him') cols.push({ key: 'me', label: names().me, k: e.mult });
+  if (e.who !== 'me') cols.push({ key: 'him', label: names().him, k: e.mult * f });
+  const totalK = cols.reduce((a, c) => a + c.k, 0) * span;
+  const showTotal = cols.length > 1 || span > 1;
+  if (showTotal) cols.push({ key: 'tot', label: span > 1 ? `Всего ×${span} дн.` : 'Всего', k: totalK });
+  const row = (cells, cls = '') => `<div class="it-row ${cls}" style="--cols:${cols.length}">${cells}</div>`;
+  const head = row(`<span></span>${cols.map(c => `<b class="${c.key}">${esc(c.label)}</b>`).join('')}`, 'head');
+  const body = d.ing.map(i => {
+    const p = product(i.pid);
+    if (!p) return '';
+    return row(`<span class="it-name"><i>${pEmoji(p)}</i>${esc(p.name)}</span>${cols.map(c => `<span class="${c.key}">${fmtAmt(p, i.qty * c.k)}</span>`).join('')}`);
+  }).join('');
+  const foot = row(`<span class="it-name">Вес порции</span>${cols.map(c => `<b class="${c.key}">${fmtAmt(null, portionWeight(d, c.k))}</b>`).join('')}`, 'foot');
+  return `<h4 class="list-h">Ингредиенты</h4><div class="card ing-table">${head}${body}${foot}</div>
+    <p class="hint">Вес сырых продуктов. Граммовка посчитана так, чтобы совпадать с КБЖУ выше.</p>`;
 }
 
 // ---------- Шторка: КБЖУ дня ----------
@@ -929,16 +968,17 @@ function swipe(v) {
 
 // Шаг 2 — кладовка
 function wzPantry() {
-  const { pantry, chosen } = wizardNeeds(wz.wk);
+  const { pantry } = wizardNeeds(wz.draft);
   const need = pantry.filter(x => state.pantry[x.p.id] !== 'have').length;
   const items = pantry.sort((a, b) => a.p.name.localeCompare(b.p.name, 'ru'));
   return `<div class="wz-head"><small>Шаг 2</small><h2>Проверим кладовку</h2>
-      <p>${chosen ? `Для выбранных блюд нужны эти запасы.` : 'Запасы, которые используются в блюдах.'} Нажмите на то, что <b class="c-low">заканчивается</b> или чего <b class="c-out">нет</b> — это попадёт в список покупок.</p></div>
-    ${items.length ? `<div class="pantry-grid">${items.map(({ p, dishes }) => {
+      <p>Меню на неделю уже прикинуто — вот сколько запасов на него уйдёт. Нажмите на то, что <b class="c-low">заканчивается</b> или чего <b class="c-out">нет</b> — это попадёт в список покупок.</p></div>
+    ${items.length ? `<div class="pantry-grid">${items.map(({ p, qty, dishes }) => {
       const st = state.pantry[p.id];
       return `<button class="jar ${st}" data-act="wzPantryCycle" data-pid="${p.id}">
         <span class="jar-name">${PRODUCT_EMOJI[p.id] || ''} ${esc(p.name)}</span><span class="jar-st"><i></i>${STATUS[st]}</span>
-        <span class="jar-for">${esc([...new Set(dishes)].slice(0, 2).join(', '))}</span></button>`;
+        <span class="jar-need">на неделю <b>${fmtQty(p, qty)}</b></span>
+        <span class="jar-for">${esc(dishes.slice(0, 2).join(', '))}${dishes.length > 2 ? ` +${dishes.length - 2}` : ''}</span></button>`;
     }).join('')}</div>` : empty('🫙', 'Запасы не нужны', 'Для выбранных блюд ничего из кладовки не требуется.')}
     <div class="wz-foot sticky">
       <div class="wz-count">${need ? `<span class="c-out">купить: ${need}</span>` : '<span class="c-have">всё есть ✓</span>'}</div>
@@ -948,7 +988,7 @@ function wzPantry() {
 
 // Шаг 3 — холодильник
 function wzFridge() {
-  const { fresh, chosen } = wizardNeeds(wz.wk);
+  const { fresh } = wizardNeeds(wz.draft);
   const hidden = shopState(wz.wk).hidden;
   const ids = new Set(fresh.map(x => x.p.id));
   const extra = Object.keys(hidden).map(id => product(id)).filter(p => p && !ids.has(p.id) && !state.pantry[p.id]);
@@ -957,10 +997,10 @@ function wzFridge() {
     const items = fresh.filter(x => x.p.cat === cat).sort((a, b) => a.p.name.localeCompare(b.p.name, 'ru'));
     if (!items.length) return '';
     return `<h3 class="group-title"><span>${CATS[cat].emoji}</span>${CATS[cat].name}</h3>
-      <div class="fridge-grid">${items.map(({ p }) => fridgeChip(p, !!hidden[p.id])).join('')}</div>`;
+      <div class="fridge-grid">${items.map(({ p, qty }) => fridgeChip(p, !!hidden[p.id], qty)).join('')}</div>`;
   }).join('');
   return `<div class="wz-head"><small>Шаг 3</small><h2>Что уже есть в холодильнике?</h2>
-      <p>Отметьте продукты, которых дома хватит на ${chosen ? 'выбранные блюда' : 'неделю'}. Их не будет в списке покупок, а блюда с ними попадут в меню охотнее.</p></div>
+      <p>Под каждым продуктом — сколько нужно на неделю на двоих. Отметьте то, чего дома хватит: его не будет в списке покупок.</p></div>
     <div class="add-row wz-search">
       <div class="search">${I.search}<input id="wz-search" data-input="wzSearch" placeholder="Есть что-то ещё? Например, шпинат" autocomplete="off" value="${esc(wz.q)}"></div>
       <div class="suggest" id="wz-suggest">${wzSuggest()}</div>
@@ -973,9 +1013,9 @@ function wzFridge() {
     </div>`;
 }
 
-function fridgeChip(p, on) {
+function fridgeChip(p, on, qty) {
   return `<button class="fridge${on ? ' on' : ''}" data-act="wzFridge" data-pid="${p.id}">
-    <span class="fr-emoji">${PRODUCT_EMOJI[p.id] || CATS[p.cat].emoji}</span><span class="fr-name">${esc(p.name)}</span>
+    <span class="fr-emoji">${PRODUCT_EMOJI[p.id] || CATS[p.cat].emoji}</span><span class="fr-name">${esc(p.name)}${qty ? `<small>нужно ${fmtQty(p, qty)}</small>` : ''}</span>
     <span class="fr-check">${I.check}</span></button>`;
 }
 
@@ -990,20 +1030,27 @@ function wzSuggest() {
 // Шаг 4 — итог
 function wzDone() {
   const pr = prefsOf(wz.wk);
-  const { pantry } = wizardNeeds(wz.wk);
+  const { pantry } = wizardNeeds(wz.draft);
   const buy = pantry.filter(x => state.pantry[x.p.id] !== 'have').length;
   const home = Object.keys(shopState(wz.wk).hidden).length;
   const hasPlan = planOf(wz.wk).length > 0;
+  const dishesN = new Set(wz.draft.map(e => e.dishId)).size;
   const tile = (emoji, n, label, cls) => `<div class="wz-tile ${cls}"><span>${emoji}</span><b>${n}</b><small>${label}</small></div>`;
-  return `<div class="wz-head center-text"><div class="wz-hero">✨</div><small>Шаг 4 · ${fmtRange(wz.wk)}</small><h2>Всё готово к планированию</h2>
-      <p>Составлю меню на 7 дней под ваши цели по КБЖУ: чаще возьму то, что вы выбрали, и то, что есть дома.</p></div>
+  const g = p => kcalOf(state.settings.goals[p]);
+  return `<div class="wz-head center-text"><div class="wz-hero">✨</div><small>Шаг 4 · ${fmtRange(wz.wk)}</small><h2>Меню на неделю готово</h2>
+      <p>${dishesN} ${plural(dishesN, 'блюдо', 'блюда', 'блюд')} под ваши цели по КБЖУ. Сохраните его или попросите другой вариант — он учтёт и то, что есть дома.</p></div>
+    <div class="wz-kcal">
+      <div class="me"><small>${esc(names().me)} · в среднем</small><b>${num(planAvgKcal(wz.draft, 'me'))}</b><span>из ${num(g('me'))} ккал</span></div>
+      <div class="him"><small>${esc(names().him)} · в среднем</small><b>${num(planAvgKcal(wz.draft, 'him'))}</b><span>из ${num(g('him'))} ккал</span></div>
+    </div>
     <div class="wz-tiles">
       ${tile('♥', pr.like.length, 'хочу', 'like')}${tile('★', pr.star.length, 'обязательно', 'star')}${tile('✕', pr.nope.length, 'не сейчас', 'nope')}
       ${tile('🫙', buy, 'докупить запасов', 'jar')}${tile('🏠', home, 'есть дома', 'home')}${tile('🍽', state.settings.factor.toFixed(1).replace('.', ','), 'порция мужа ×', 'him')}
     </div>
     ${hasPlan ? '<div class="alert">Текущее меню этой недели заменится новым.</div>' : ''}
-    <div class="btn-col"><button class="btn primary wide big" data-act="wzBuild">${I.spark}<span>Составить меню</span></button>
-    <button class="btn ghost wide" data-act="wzResetPrefs">${I.undo}<span>Сбросить выбор блюд</span></button></div>`;
+    <div class="btn-col"><button class="btn primary wide big" data-act="wzBuild">${I.check}<span>Сохранить меню</span></button>
+    <button class="btn ghost wide" data-act="wzReroll">🎲<span>Другой вариант</span></button>
+    <button class="btn ghost wide small" data-act="wzResetPrefs">${I.undo}<span>Сбросить выбор блюд</span></button></div>`;
 }
 
 // ---------- Действия ----------
@@ -1011,7 +1058,15 @@ const A = {
   // мастер планирования
   wzClose: closeWizard,
   wzBack() { if (wz.step > 0) { wz.step--; renderWizard(); } },
-  wzNext() { if (wz.step < 3) { wz.step++; renderWizard(); } },
+  wzNext() {
+    if (wz.step >= 3) return;
+    if (wz.step === 0) {
+      const sig = JSON.stringify(prefsOf(wz.wk));
+      if (!wz.draft || wz.sig !== sig) { wz.draft = buildPlan(wz.wk); wz.sig = sig; }
+    }
+    wz.step++; renderWizard();
+  },
+  wzReroll() { wz.draft = buildPlan(wz.wk); buzz(); renderWizard(true); toast('Вот другой вариант 🎲'); },
   wzSwipe(el) { swipe(el.dataset.v); },
   wzEditDish() { openEditor(wz.deck[wz.i], { after: 'wizard' }); },
   wzNewDish() { openEditor(null, { after: 'wizard' }); },
@@ -1039,7 +1094,7 @@ const A = {
   wzResetPrefs() {
     state.prefs[wz.wk] = { like: [], star: [], nope: [] };
     wz.deck = shuffleArr(state.dishes.filter(d => d.ing.length).map(d => d.id));
-    wz.i = 0; wz.hist = []; wz.step = 0; renderWizard(); save();
+    wz.i = 0; wz.hist = []; wz.step = 0; wz.draft = null; renderWizard(); save();
   },
   wzPantryCycle(el) { const p = el.dataset.pid; state.pantry[p] = NEXT[state.pantry[p]]; buzz(); save(); renderWizard(true); },
   wzFridge(el) {
@@ -1053,7 +1108,7 @@ const A = {
   },
   wzBuild() {
     const wk = wz.wk;
-    autoplanWeek(wk);
+    state.plans[wk] = wz.draft || buildPlan(wk);
     closeWizard();
     ui.tab = 'menu'; ui.weekOffset = Math.round((parseISO(wk) - parseISO(weekKeyOffset(0))) / (7 * 864e5));
     save(); saveUI(); render(); window.scrollTo(0, 0);

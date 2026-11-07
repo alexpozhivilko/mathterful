@@ -668,3 +668,28 @@ textarea.input { height: auto; padding: 12px 14px; line-height: 1.5; resize: ver
 .toast.has-action span { min-width: 0; }
 .seg.mini button { flex: none; overflow: visible; }
 .ing-head .field-label { min-width: 0; }
+
+/* ---------- Граммовка ---------- */
+.ing-table { padding: 6px 4px; }
+.it-row { display: grid; grid-template-columns: minmax(0, 1fr) repeat(var(--cols), minmax(58px, auto)); gap: 6px; align-items: center; padding: 8px 10px; font-size: 14px; }
+.it-row + .it-row { border-top: 1px solid var(--line); }
+.it-row > span:not(.it-name), .it-row > b { text-align: right; white-space: nowrap; font-weight: 700; }
+.it-row.head b { font-size: 11.5px; text-transform: uppercase; letter-spacing: .04em; white-space: normal; line-height: 1.2; }
+.it-row .me { color: var(--me); } .it-row .him { color: var(--him); } .it-row .tot { color: var(--text); }
+.it-row.head .tot { color: var(--muted); }
+.it-row:not(.head):not(.foot) .me, .it-row:not(.head):not(.foot) .him { color: var(--text); }
+.it-name { display: flex; align-items: center; gap: 8px; font-weight: 600; min-width: 0; }
+.it-name i { font-style: normal; width: 22px; text-align: center; flex: none; }
+.it-row.foot { background: rgba(255, 255, 255, .03); border-radius: 0 0 16px 16px; }
+.it-row.foot .it-name { color: var(--muted); font-weight: 700; }
+.entry-head + .nutr-pair { margin-top: 0; margin-bottom: 4px; }
+.jar-need { font-size: 11.5px; color: var(--muted); font-weight: 600; }
+.jar-need b { color: var(--text); }
+.fr-name small { display: block; font-size: 11px; font-weight: 600; color: var(--dim); margin-top: 1px; }
+.fridge.on .fr-name small { color: var(--muted); }
+.wz-kcal { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 16px; }
+.wz-kcal > div { display: flex; flex-direction: column; padding: 12px 14px; border-radius: 18px; background: var(--surface); border: 1px solid var(--line); }
+.wz-kcal small { font-weight: 700; } .wz-kcal .me small { color: var(--me); } .wz-kcal .him small { color: var(--him); }
+.wz-kcal b { font-size: 24px; }
+.wz-kcal span { color: var(--muted); font-size: 12px; font-weight: 600; }
+.fr-name, .jar-name, .it-name, .chip-name, .dish-card b { -webkit-hyphens: auto; hyphens: auto; overflow-wrap: break-word; }
