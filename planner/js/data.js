@@ -111,6 +111,18 @@ const RAW_PRODUCTS = [
   ['peas', 'Зелёный горошек', 'frozen', 'g', 0, 81, 5.4, 0.4, 14],
   ['vegmix', 'Овощная смесь', 'frozen', 'g', 0, 50, 2.5, 0.4, 9],
 
+  ['sesame', 'Кунжут', 'nuts', 'g', 0, 573, 18, 50, 23, 'P'],
+  ['ginger', 'Имбирь', 'veg', 'g', 0, 80, 1.8, 0.8, 18],
+  ['coconut', 'Кокосовое молоко', 'canned', 'ml', 0, 197, 2.3, 21, 2.8],
+  ['curry', 'Карри (приправа)', 'spice', 'g', 0, 325, 14, 14, 58, 'P'],
+  ['cinnamon', 'Корица', 'spice', 'g', 0, 247, 4, 1.2, 81, 'P'],
+  ['noodles', 'Рисовая лапша', 'grain', 'g', 0, 364, 6, 0.6, 80, 'P'],
+  ['olives', 'Оливки', 'canned', 'g', 0, 115, 0.8, 11, 6],
+  ['pesto', 'Песто', 'sauce', 'g', 0, 450, 5, 45, 6],
+  ['ricotta', 'Рикотта', 'dairy', 'g', 0, 174, 11, 13, 3],
+  ['scallion', 'Зелёный лук', 'veg', 'g', 0, 32, 1.8, 0.2, 7],
+  ['mango', 'Манго', 'fruit', 'pcs', 300, 60, 0.8, 0.4, 15],
+  ['sardine', 'Сардины консервированные', 'fish', 'g', 0, 208, 25, 11, 0],
   ['coffee', 'Кофе', 'drinks', 'g', 0, 0, 0, 0, 0, 'P'],
   ['tea', 'Чай', 'drinks', 'g', 0, 0, 0, 0, 0, 'P'],
 ];
@@ -177,11 +189,57 @@ const RAW_DISHES = [
   ['chocolate', 'Тёмный шоколад', '🍫', 's', false, [['choco', 20]]],
 ];
 
+// Библиотека рецептов для рекомендаций: их нет в стартовом списке, приложение предлагает их по вкусу
+const RAW_SUGGESTED = [
+  ['r_sabich', 'Сабих', '🥙', 'ld', false, [['pita', 1], ['eggplant', 150], ['eggs', 1], ['tahini', 20], ['tomato', 60], ['cucumber', 60], ['oil', 8]]],
+  ['r_mujadara', 'Мджадра — чечевица с рисом и луком', '🍛', 'ld', true, [['lentils', 50], ['rice', 50], ['onion', 1], ['olive', 10], ['cumin', 1], ['yogurt', 60]]],
+  ['r_chili', 'Чили с фасолью', '🌶️', 'ld', true, [['beans', 150], ['cantom', 120], ['bellpep', 80], ['onion', 0.5], ['corn', 50], ['paprika', 2], ['cumin', 1], ['rice', 50], ['olive', 7]]],
+  ['r_chickcurry', 'Карри из нута с кокосовым молоком', '🍛', 'ld', true, [['chickpeas', 150], ['coconut', 80], ['spinach', 60], ['onion', 0.5], ['curry', 3], ['rice', 60], ['oil', 5]]],
+  ['r_peanutnoodles', 'Лапша с тофу в арахисовом соусе', '🍜', 'ld', false, [['noodles', 70], ['tofu', 150], ['pb', 20], ['soy', 15], ['carrot', 0.5], ['cucumber', 80], ['sesame', 5]]],
+  ['r_risotto', 'Ризотто с грибами', '🍚', 'd', false, [['rice', 70], ['mushroom', 150], ['onion', 0.5], ['cheese', 20], ['butter', 8], ['greens', 5]]],
+  ['r_pestopasta', 'Паста с песто и моцареллой', '🍝', 'ld', false, [['pasta', 80], ['pesto', 25], ['mozz', 50], ['tomato', 100]]],
+  ['r_bakedsalmon', 'Лосось, запечённый с овощами', '🐟', 'd', false, [['salmon', 150], ['zucchini', 150], ['bellpep', 100], ['lemon', 0.25], ['olive', 5], ['greens', 5]]],
+  ['r_fishcakes', 'Рыбные котлеты с зеленью', '🐟', 'ld', true, [['whitefish', 170], ['eggs', 0.5], ['oats', 20], ['onion', 0.25], ['greens', 10], ['oil', 7], ['cucumber', 100]]],
+  ['r_sardinetoast', 'Тосты с сардинами и томатами', '🐟', 'bs', false, [['sardine', 80], ['bread', 60], ['tomato', 80], ['lemon', 0.1]]],
+  ['r_oatpancake', 'Овсяноблин с сыром и томатами', '🥞', 'b', false, [['oats', 35], ['eggs', 2], ['milk', 40], ['cheese', 20], ['tomato', 60]]],
+  ['r_overnight', 'Ленивая овсянка в банке', '🫙', 'b', false, [['oats', 45], ['yogurt', 100], ['milk', 80], ['banana', 0.5], ['honey', 8], ['cinnamon', 1]]],
+  ['r_mangobowl', 'Йогурт с манго и гранолой', '🥭', 'bs', false, [['yogurt', 200], ['mango', 0.5], ['granola', 30]]],
+  ['r_tofuscramble', 'Скрэмбл из тофу со шпинатом', '🍳', 'b', false, [['tofu', 180], ['spinach', 60], ['tomato', 80], ['onion', 0.25], ['olive', 5], ['bread', 40]]],
+  ['r_greenshak', 'Шакшука со шпинатом и фетой', '🍳', 'bld', false, [['eggs', 2], ['cantom', 150], ['spinach', 80], ['feta', 30], ['onion', 0.5], ['olive', 7], ['bread', 40]]],
+  ['r_blini', 'Блинчики с творогом', '🥞', 'b', true, [['flour', 40], ['milk', 100], ['eggs', 1], ['tvorog', 100], ['sugar', 8], ['oil', 5]]],
+  ['r_lasagna', 'Овощная лазанья с рикоттой', '🍝', 'd', true, [['pasta', 70], ['ricotta', 80], ['cantom', 120], ['zucchini', 120], ['spinach', 50], ['mozz', 40]]],
+  ['r_lavashpizza', 'Пицца на тортилье', '🍕', 'ds', false, [['tortilla', 1], ['cantom', 60], ['mozz', 60], ['mushroom', 60], ['bellpep', 50], ['olives', 20]]],
+  ['r_quesadilla', 'Кесадилья с фасолью и сыром', '🌮', 'ld', false, [['tortilla', 1], ['beans', 100], ['cheese', 35], ['corn', 40], ['yogurt', 40], ['scallion', 10]]],
+  ['r_quinoasalad', 'Салат с киноа, авокадо и фетой', '🥗', 'ld', false, [['quinoa', 55], ['avocado', 0.4], ['feta', 40], ['cucumber', 100], ['tomato', 100], ['lemon', 0.2], ['olive', 7]]],
+  ['r_batatsalad', 'Тёплый салат с бататом и нутом', '🍠', 'ld', false, [['sweetpot', 200], ['chickpeas', 120], ['spinach', 50], ['tahini', 20], ['lemon', 0.2], ['olive', 5]]],
+  ['r_mushsoup', 'Грибной крем-суп', '🍄', 'ld', true, [['mushroom', 200], ['potato', 120], ['onion', 0.5], ['smetana', 30], ['butter', 5], ['bread', 30]]],
+  ['r_minestrone', 'Минестроне', '🍲', 'ld', true, [['zucchini', 100], ['carrot', 0.5], ['beans', 80], ['pasta', 30], ['cantom', 100], ['cabbage', 60], ['olive', 7], ['cheese', 10]]],
+  ['r_okroshka', 'Окрошка на кефире', '🥒', 'l', true, [['kefir', 300], ['cucumber', 120], ['potato', 100], ['eggs', 1], ['greens', 15], ['scallion', 10]]],
+  ['r_bulgurstew', 'Булгур с овощным рагу', '🥘', 'ld', true, [['bulgur', 60], ['eggplant', 120], ['zucchini', 100], ['cantom', 100], ['bellpep', 70], ['olive', 8]]],
+  ['r_falafel', 'Запечённый фалафель с тхиной', '🧆', 'ld', false, [['chickpeas', 160], ['onion', 0.25], ['greens', 15], ['flour', 15], ['cumin', 2], ['olive', 8], ['pita', 1], ['tahini', 15]]],
+  ['r_shrimpcurry', 'Креветки в кокосовом карри', '🍤', 'd', false, [['shrimp', 150], ['coconut', 80], ['bellpep', 80], ['curry', 3], ['ginger', 5], ['rice', 60]]],
+  ['r_grillsquid', 'Кальмары гриль с салатом', '🦑', 'd', false, [['squid', 200], ['lettuce', 80], ['tomato', 100], ['lemon', 0.25], ['olive', 8]]],
+  ['r_broccasserole', 'Запеканка с брокколи и сыром', '🥦', 'd', true, [['broccoli', 200], ['eggs', 2], ['cheese', 30], ['milk', 60], ['onion', 0.25]]],
+  ['r_tvorogmousse', 'Творожный мусс с ягодами', '🫐', 's', false, [['tvorog', 150], ['yogurt', 50], ['berries', 70], ['honey', 8]]],
+  ['r_hummussticks', 'Хумус с овощными палочками', '🥕', 's', false, [['hummus', 60], ['carrot', 1], ['cucumber', 100], ['bellpep', 80]]],
+  ['r_ricottatoast', 'Тост с рикоттой, мёдом и орехами', '🍯', 'bs', false, [['bread', 50], ['ricotta', 60], ['honey', 10], ['walnut', 10]]],
+  ['r_energyballs', 'Финиковые шарики с миндалём', '🍫', 's', false, [['dates', 35], ['almond', 15], ['oats', 15], ['choco', 5]]],
+  ['r_smoothie', 'Смузи банан–шпинат', '🥤', 'bs', false, [['banana', 1], ['spinach', 40], ['yogurt', 120], ['milk', 100], ['oats', 15]]],
+  ['r_buckpumpkin', 'Гречка с тыквой и фетой', '🎃', 'ld', false, [['buckwheat', 60], ['pumpkin', 200], ['feta', 40], ['spinach', 40], ['olive', 7]]],
+  ['r_pitaegg', 'Пита с яйцом и авокадо', '🫓', 'b', false, [['pita', 1], ['eggs', 2], ['avocado', 0.4], ['tomato', 60]]],
+  ['r_carrotsoup', 'Морковный суп с имбирём', '🥕', 'ld', true, [['carrot', 2], ['ginger', 8], ['onion', 0.5], ['coconut', 50], ['lentils', 30], ['oil', 5]]],
+  ['r_tunapasta', 'Паста с тунцом и оливками', '🍝', 'ld', false, [['pasta', 80], ['tuna', 100], ['cantom', 120], ['olives', 25], ['olive', 5], ['greens', 5]]],
+];
+
 export const DISHES = RAW_DISHES.map(([id, name, emoji, meals, batch, ing]) => ({
   id, name, emoji,
   meals: meals.split(''),
   batch,
   ing: ing.map(([pid, qty]) => ({ pid, qty })),
+}));
+
+export const SUGGESTED = RAW_SUGGESTED.map(([id, name, emoji, meals, batch, ing]) => ({
+  id, name, emoji, meals: meals.split(''), batch, ing: ing.map(([pid, qty]) => ({ pid, qty })),
 }));
 
 export const MEALS = [
@@ -201,5 +259,5 @@ export const PRODUCT_EMOJI = {
   cheese: '🧀', feta: '🧀', mozz: '🧀', butter: '🧈', salmon: '🐟', whitefish: '🐟', tuna: '🐟', shrimp: '🍤', squid: '🦑',
   bread: '🍞', pita: '🫓', tortilla: '🫓', rice: '🍚', pasta: '🍝', oats: '🥣', corn: '🌽', chickpeas: '🫘', beans: '🫘',
   cantom: '🥫', hummus: '🫙', honey: '🍯', salt: '🧂', olive: '🫒', oil: '🌻', walnut: '🌰', almond: '🥜', pb: '🥜',
-  choco: '🍫', berries: '🫐', peas: '🫛', coffee: '☕', tea: '🍵', dates: '🌴', sugar: '🍬', lentils: '🫘', flour: '🌾',
+  choco: '🍫', berries: '🫐', peas: '🫛', sesame: '🌰', ginger: '🫚', coconut: '🥥', mango: '🥭', olives: '🫒', pesto: '🌿', ricotta: '🧀', scallion: '🧅', sardine: '🐟', noodles: '🍜', coffee: '☕', tea: '🍵', dates: '🌴', sugar: '🍬', lentils: '🫘', flour: '🌾',
 };

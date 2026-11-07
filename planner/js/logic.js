@@ -191,7 +191,10 @@ function context(wk) {
   const pr = state.prefs[wk] || { like: [], star: [], nope: [] };
   const like = new Set(pr.like), star = new Set(pr.star), nope = new Set(pr.nope);
   const home = new Set(Object.keys(shopState(wk).hidden));
-  const pref = d => (star.has(d.id) ? 5 : like.has(d.id) ? 3 : 1) * (d.ing.some(i => home.has(i.pid)) ? 1.4 : 1);
+  const rt = state.ratings || {};
+  // Оценки прошлых недель: любимое чаще, «не очень» — реже
+  const learned = d => { const r = rt[d.id]; return r > 0 ? 1 + 0.35 * r : r < 0 ? 0.4 : 1; };
+  const pref = d => (star.has(d.id) ? 5 : like.has(d.id) ? 3 : 1) * (d.ing.some(i => home.has(i.pid)) ? 1.4 : 1) * learned(d);
   const all = state.dishes.filter(d => d.ing.length && !nope.has(d.id));
   return { like, star, nope, home, pref, all, shared: all.filter(d => !isSeafood(d)) };
 }
@@ -308,13 +311,25 @@ export function buildPlan(wk) {
     e.who = 'him';
     plan.push(mk(e.day, e.meal, d, 1, 'me'));
   }
+  markAuto(plan, ctx);
   return plan;
+}
+
+// Отметить блюда, которые подобраны автоматически (не из «хочу» / «обязательно»)
+function markAuto(entries, ctx) {
+  if (!ctx.like.size && !ctx.star.size) return;
+  for (const e of entries) {
+    if (ctx.like.has(e.dishId) || ctx.star.has(e.dishId)) delete e.auto;
+    else e.auto = true;
+  }
 }
 
 export function shuffleDay(wk, day) {
   const plan = planOf(wk).filter(e => !(e.day === day && e.span === 1));
   const ctx = context(wk);
+  const before = new Set(plan.map(e => e.id));
   generateDay(plan, day, ctx.shared, usedCounts(plan), ctx);
+  markAuto(plan.filter(e => !before.has(e.id)), ctx);
   state.plans[wk] = plan;
 }
 
