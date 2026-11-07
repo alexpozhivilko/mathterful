@@ -1,9 +1,11 @@
 import { state, save, saveNow, uid, product, allProducts, dish, invalidateProducts, replaceState, resetState } from './store.js';
 import { CATS, CAT_ORDER, MEALS, DISH_EMOJIS, PRODUCT_EMOJI } from './data.js';
+import { parseIngredients, ingredientsToText } from './parse.js';
 import {
   WEEKDAYS, WD_SHORT, MONTHS, iso, parseISO, today, addDays, weekKeyOffset, weekDates, fmtDay, fmtRange,
   migrateWeekStart, kcalOf, dishNutr, isSeafood, planOf, covers, forPerson, entryNutr, dayNutr,
   shopState, shoppingList, fmtQty, autoplanWeek, shuffleDay, money, expensesByWeek, monthTotal, prefsOf, wizardNeeds,
+  buildPlan, planNeeds, planAvgKcal, grams,
 } from './logic.js';
 
 // ---------- Иконки ----------
@@ -236,6 +238,7 @@ const NEXT = { have: 'low', low: 'out', out: 'have' };
 
 function viewPantry() {
   const entries = Object.entries(state.pantry).map(([pid, st]) => ({ p: product(pid), st })).filter(x => x.p);
+  const weekNeed = planNeeds(planOf(weekKeyOffset(0)));
   const cnt = { have: 0, low: 0, out: 0 };
   entries.forEach(x => cnt[x.st]++);
   const f = ui.pantryFilter;
@@ -258,6 +261,7 @@ function viewPantry() {
     return `<section class="group"><h3 class="group-title"><span>${CATS[cat].emoji}</span>${CATS[cat].name}</h3>
       <div class="pantry-grid">${items.map(({ p, st }) => `<button class="jar ${st}${ui.pantryEdit ? ' editing' : ''}" data-act="${ui.pantryEdit ? 'pantryRemove' : 'pantryCycle'}" data-pid="${p.id}">
         <span class="jar-name">${esc(p.name)}</span><span class="jar-st"><i></i>${STATUS[st]}</span>
+        ${weekNeed.has(p.id) ? `<span class="jar-need">на этой неделе <b>${fmtQty(p, weekNeed.get(p.id).qty)}</b></span>` : ''}
         ${ui.pantryEdit ? `<span class="jar-x">${I.x}</span>` : ''}</button>`).join('')}</div></section>`;
   }).join('');
 
@@ -405,7 +409,7 @@ function closeSheet() {
   const w = sheet.wrap;
   sheet = null;
   w.classList.remove('open');
-  document.body.classList.remove('noscroll');
+  if (!wz) document.body.classList.remove('noscroll');
   setTimeout(() => w.remove(), 320);
 }
 function enableDrag(wrap) {
@@ -437,12 +441,33 @@ function confirmSheet(title, text, okLabel, onOk, danger = true) {
 }
 const pending = { confirm: null };
 
-function toast(text) {
+let toastFn = null;
+function toast(text, action) {
   const t = $('#toast');
-  t.textContent = text;
+  t.innerHTML = `<span>${esc(text)}</span>${action ? `<button data-act="toastAction">${esc(action.label)}</button>` : ''}`;
+  toastFn = action ? action.fn : null;
+  t.classList.toggle('has-action', !!action);
   t.classList.add('show');
   clearTimeout(toast.t);
-  toast.t = setTimeout(() => t.classList.remove('show'), 2200);
+  toast.t = setTimeout(() => { t.classList.remove('show'); toastFn = null; }, action ? 5000 : 2200);
+}
+
+// Удаление блюда насовсем (с возможностью сразу вернуть)
+function removeDish(id) {
+  const idx = state.dishes.findIndex(x => x.id === id);
+  if (idx < 0) return null;
+  const d = state.dishes[idx];
+  const entries = {};
+  for (const wk of Object.keys(state.plans)) {
+    entries[wk] = state.plans[wk].filter(e => e.dishId === id);
+    state.plans[wk] = state.plans[wk].filter(e => e.dishId !== id);
+  }
+  for (const pr of Object.values(state.prefs || {})) for (const k of ['like', 'star', 'nope']) pr[k] = pr[k].filter(x => x !== id);
+  state.dishes.splice(idx, 1);
+  return () => {
+    state.dishes.splice(Math.min(idx, state.dishes.length), 0, d);
+    for (const [wk, list] of Object.entries(entries)) if (list.length) (state.plans[wk] ||= []).push(...list);
+  };
 }
 
 function confetti() {
@@ -511,6 +536,12 @@ function entrySheet() {
       <span class="eh-emoji">${d.emoji}</span>
       <div><small>${mealOf(e.meal).emoji} ${mealOf(e.meal).name} · ${WD_SHORT[date.getDay()]}, ${fmtDay(date)}</small><h2>${esc(d.name)}</h2></div>
     </div>
+    <div class="nutr-pair">
+      ${e.who !== 'him' ? `<div class="np me"><small>${esc(nmz.me)} · порция ${fmtAmt(null, portionWeight(d, e.mult))}</small><b>${num(nm.kcal)} ккал</b><span>Б ${r0(nm.p)} · Ж ${r0(nm.f)} · У ${r0(nm.c)}</span></div>` : ''}
+      ${e.who !== 'me' ? `<div class="np him"><small>${esc(nmz.him)} · порция ${fmtAmt(null, portionWeight(d, e.mult * state.settings.factor))}</small><b>${num(nh.kcal)} ккал</b><span>Б ${r0(nh.p)} · Ж ${r0(nh.f)} · У ${r0(nh.c)}</span></div>` : ''}
+    </div>
+    ${ingTable(d, e)}
+    ${d.note ? `<div class="note">📝 ${esc(d.note)}</div>` : ''}
     <label class="field-label">Для кого</label>
     <div class="seg wide">${[['both', 'Для обоих'], ['me', nmz.me], ['him', nmz.him]].map(([k, l]) => `<button class="${e.who === k ? 'on' : ''}" data-act="draftSet" data-k="who" data-v="${k}">${esc(l)}</button>`).join('')}</div>
     ${sea && e.who !== 'me' ? `<div class="alert">🦐 В этом блюде морепродукты, а ${esc(nmz.him.toLowerCase())} их не ест. Лучше поставить «${esc(nmz.me)}» и добавить ему что-то другое.</div>` : ''}
@@ -523,16 +554,46 @@ function entrySheet() {
       <div class="stepper-val"><b>×${String(e.mult).replace('.', ',')}</b><small>${e.mult === 1 ? 'обычная' : e.mult < 1 ? 'поменьше' : 'побольше'}</small></div>
       <button class="icon-btn soft" data-act="draftMult" data-d="0.25" ${e.mult >= 3 ? 'disabled' : ''}>${I.plus}</button>
     </div>
-    <div class="nutr-pair">
-      ${e.who !== 'him' ? `<div class="np me"><small>${esc(nmz.me)}</small><b>${num(nm.kcal)} ккал</b><span>Б ${r0(nm.p)} · Ж ${r0(nm.f)} · У ${r0(nm.c)}</span></div>` : ''}
-      ${e.who !== 'me' ? `<div class="np him"><small>${esc(nmz.him)} · ×${String(state.settings.factor).replace('.', ',')}</small><b>${num(nh.kcal)} ккал</b><span>Б ${r0(nh.p)} · Ж ${r0(nh.f)} · У ${r0(nh.c)}</span></div>` : ''}
-    </div>
     <div class="btn-col">
       <button class="btn primary wide" data-act="draftSave">${draft.isNew ? `${I.plus}<span>Добавить в меню</span>` : `${I.check}<span>Сохранить</span>`}</button>
       ${draft.isNew
         ? `<button class="btn ghost wide" data-act="draftBack">${I.left}<span>Выбрать другое блюдо</span></button>`
-        : `<div class="btn-row"><button class="btn ghost grow" data-act="draftReplace">${I.undo}<span>Заменить</span></button><button class="btn danger grow" data-act="draftDelete">${I.trash}<span>Удалить</span></button></div>`}
+        : `<div class="btn-row"><button class="btn ghost grow" data-act="draftReplace">${I.undo}<span>Заменить</span></button><button class="btn ghost grow" data-act="draftRecipe">${I.edit}<span>Рецепт</span></button><button class="btn danger square" data-act="draftDelete" aria-label="Убрать из меню">${I.trash}</button></div>`}
     </div>`;
+}
+
+
+// ---------- Граммовка ----------
+const dec = (v, k = 1) => String(Math.round(v * 10 ** k) / 10 ** k).replace('.', ',');
+// Количество продукта для показа: граммы округляем до 5, штуки — до десятых
+function fmtAmt(p, q) {
+  if (p && p.unit === 'pcs') return `${dec(q)} ${p.ul || 'шт'}`;
+  const u = p && p.unit === 'ml' ? ['мл', 'л'] : ['г', 'кг'];
+  if (q >= 1000) return `${dec(q / 1000, 2)} ${u[1]}`;
+  if (q < 10) return `${dec(q)} ${u[0]}`;
+  return `${Math.round(q / 5) * 5} ${u[0]}`;
+}
+const portionWeight = (d, k) => d.ing.reduce((a, i) => { const p = product(i.pid); return a + (p ? grams(p, i.qty * k) : 0); }, 0);
+
+function ingTable(d, e) {
+  const f = state.settings.factor;
+  const span = Math.min(e.span, 7 - e.day);
+  const cols = [];
+  if (e.who !== 'him') cols.push({ key: 'me', label: names().me, k: e.mult });
+  if (e.who !== 'me') cols.push({ key: 'him', label: names().him, k: e.mult * f });
+  const totalK = cols.reduce((a, c) => a + c.k, 0) * span;
+  const showTotal = cols.length > 1 || span > 1;
+  if (showTotal) cols.push({ key: 'tot', label: span > 1 ? `Всего ×${span} дн.` : 'Всего', k: totalK });
+  const row = (cells, cls = '') => `<div class="it-row ${cls}" style="--cols:${cols.length}">${cells}</div>`;
+  const head = row(`<span></span>${cols.map(c => `<b class="${c.key}">${esc(c.label)}</b>`).join('')}`, 'head');
+  const body = d.ing.map(i => {
+    const p = product(i.pid);
+    if (!p) return '';
+    return row(`<span class="it-name"><i>${pEmoji(p)}</i>${esc(p.name)}</span>${cols.map(c => `<span class="${c.key}">${fmtAmt(p, i.qty * c.k)}</span>`).join('')}`);
+  }).join('');
+  const foot = row(`<span class="it-name">Вес порции</span>${cols.map(c => `<b class="${c.key}">${fmtAmt(null, portionWeight(d, c.k))}</b>`).join('')}`, 'foot');
+  return `<h4 class="list-h">Ингредиенты</h4><div class="card ing-table">${head}${body}${foot}</div>
+    <p class="hint">Вес сырых продуктов. Граммовка посчитана так, чтобы совпадать с КБЖУ выше.</p>`;
 }
 
 // ---------- Шторка: КБЖУ дня ----------
@@ -568,13 +629,15 @@ function openDish(id) {
         <div class="k c"><b>${r0(n.c)}</b><small>углеводы</small></div>
       </div>
       <p class="hint center">На мою порцию · порция ${esc(names().him.toLowerCase())}а ×${String(f).replace('.', ',')} ≈ ${num(n.kcal * f)} ккал</p>
+      ${d.note ? `<div class="note">📝 ${esc(d.note)}</div>` : ''}
       <h4 class="list-h">Ингредиенты на порцию</h4>
       <div class="card list">${d.ing.map(i => {
         const p = product(i.pid);
         return p ? `<div class="item static"><span class="ing-cat">${pEmoji(p)}</span><div class="item-main"><div class="item-name">${esc(p.name)}</div></div><div class="item-qty">${ingQty(p, i.qty)}</div></div>` : '';
       }).join('')}</div>
-      <div class="btn-row"><button class="btn ghost grow" data-act="editDish" data-id="${d.id}">${I.edit}<span>Изменить</span></button>
-      <button class="btn danger grow" data-act="deleteDish" data-id="${d.id}">${I.trash}<span>Удалить</span></button></div>`;
+      <div class="btn-row"><button class="btn primary grow" data-act="editDish" data-id="${d.id}">${I.edit}<span>Изменить</span></button>
+      <button class="btn ghost grow" data-act="copyDish" data-id="${d.id}">${I.plus}<span>Своя версия</span></button></div>
+      <button class="btn danger wide" style="margin-top:10px" data-act="deleteDish" data-id="${d.id}">${I.trash}<span>Удалить навсегда</span></button>`;
   });
 }
 
@@ -585,19 +648,46 @@ function ingQty(p, qty) {
 const unitLabel = p => (p.unit === 'pcs' ? (p.ul || 'шт') : p.unit === 'ml' ? 'мл' : 'г');
 
 // ---------- Шторка: редактор блюда ----------
-let ed = null; // { d, q, np }
+let ed = null; // { d, q, np, mode, text, after }
 
-function openEditor(id) {
+function openEditor(id, opts = {}) {
   const src = id ? dish(id) : null;
-  ed = {
-    d: src ? structuredClone(src) : { id: null, name: '', emoji: '🍲', meals: [], batch: false, ing: [] },
-    q: '', np: null, emojiOpen: false,
-  };
+  const d = src ? structuredClone(src) : { id: null, name: '', emoji: '🍲', meals: [], batch: false, ing: [], note: '' };
+  if (opts.copy) { d.id = null; d.name = `${d.name} — моя версия`; }
+  ed = { d, q: '', np: null, emojiOpen: false, mode: src ? 'list' : 'text', text: src ? ingredientsToText(d.ing) : '', after: opts.after || 'dish' };
   openSheet(editorSheet, 'tall');
 }
 
+// Применить текст к списку ингредиентов (новые продукты создаются здесь)
+function applyEdText() {
+  const rows = parseIngredients(ed.text);
+  const ing = [];
+  for (const r of rows) {
+    let pid = r.p?.id;
+    if (!pid) {
+      const same = state.customProducts.find(x => x.name.toLowerCase() === r.np.name.toLowerCase());
+      if (same) pid = same.id;
+      else { pid = 'c_' + uid(); state.customProducts.push({ id: pid, ...r.np }); invalidateProducts(); }
+    }
+    if (r.qtyP > 0) ing.push({ pid, qty: r.qtyP });
+  }
+  ed.d.ing = ing;
+}
+
+function edTextPreview() {
+  const rows = parseIngredients(ed.text);
+  if (!rows.length) return '';
+  return `<div class="card list parse">${rows.map(r => {
+    const p = r.p || r.np;
+    return `<div class="item static"><span class="ing-cat">${r.p ? pEmoji(r.p) : '✨'}</span>
+      <div class="item-main"><div class="item-name">${esc(p.name)}</div>${r.p ? (norm2(r.raw).startsWith(norm2(r.p.name)) ? '' : `<div class="item-sub">из «${esc(r.raw)}»</div>`) : '<div class="item-sub"><span class="pill low">новый продукт</span> КБЖУ можно добавить после</div>'}</div>
+      <div class="item-qty">${ingQty(p, r.qtyP)}</div></div>`;
+  }).join('')}</div>`;
+}
+const norm2 = s => String(s).toLowerCase().replace(/ё/g, 'е');
+
 function editorNutr() {
-  const n = dishNutr(ed.d);
+  const n = dishNutr(ed.mode === 'text' ? { ing: parseIngredients(ed.text).filter(r => r.p).map(r => ({ pid: r.p.id, qty: r.qtyP })) } : ed.d);
   return `<div class="kbju mini"><div class="k kcal"><b>${num(n.kcal)}</b><small>ккал</small></div><div class="k p"><b>${r0(n.p)}</b><small>Б</small></div><div class="k f"><b>${r0(n.f)}</b><small>Ж</small></div><div class="k c"><b>${r0(n.c)}</b><small>У</small></div></div>`;
 }
 
@@ -613,18 +703,32 @@ function editorSheet() {
     <label class="field-label">Когда едим</label>
     <div class="filters wrap">${MEALS.map(m => `<button class="fchip${d.meals.includes(m.id) ? ' on' : ''}" data-act="edMeal" data-m="${m.id}">${m.emoji} ${m.name}</button>`).join('')}
       <button class="fchip${d.batch ? ' on' : ''}" data-act="edBatch">🗓 Можно на несколько дней</button></div>
-    <label class="field-label">Ингредиенты на одну мою порцию</label>
+    <div class="ing-head"><label class="field-label">Состав на мою порцию</label>
+      <div class="seg mini">${[['text', 'Текст'], ['list', 'Список']].map(([k, l]) => `<button class="${ed.mode === k ? 'on' : ''}" data-act="edMode" data-m="${k}">${l}</button>`).join('')}</div></div>
     <div id="ed-nutr">${editorNutr()}</div>
+    ${ed.mode === 'text' ? `
+    <textarea class="input ed-text" data-input="edText" rows="7" placeholder="Пишите как удобно, по строке на продукт:
+тыква 300 г
+паста 80
+фета 40 г
+2 яйца
+чеснок 2 зубчика
+оливковое масло 1 ст.л.">${esc(ed.text)}</textarea>
+    <p class="hint">Количество можно писать в граммах, мл, штуках, ложках, стаканах. Если продукта нет в справочнике, он добавится сам.</p>
+    <div id="ed-parse">${edTextPreview()}</div>` : `
     <div class="card list ing-list">${d.ing.map((i, idx) => {
       const p = product(i.pid);
       if (!p) return '';
-      return `<div class="item static"><span class="ing-cat">${pEmoji(p)}</span><div class="item-main"><div class="item-name">${esc(p.name)}</div></div>
+      const custom = p.id.startsWith('c_');
+      return `<div class="item static"><span class="ing-cat">${pEmoji(p)}</span><div class="item-main"><div class="item-name">${esc(p.name)}</div>${custom ? `<button class="link" data-act="edEditProduct" data-pid="${p.id}">${p.kcal ? `${num(p.kcal)} ккал/100 г · изменить` : '+ добавить КБЖУ'}</button>` : ''}</div>
         <label class="qty-in"><input type="number" inputmode="decimal" step="any" min="0" data-input="edQty" data-i="${idx}" value="${i.qty}"><span>${unitLabel(p)}</span></label>
         <button class="item-x show" data-act="edRemoveIng" data-i="${idx}" aria-label="Убрать">${I.x}</button></div>`;
     }).join('') || '<p class="hint center pad">Пока нет ингредиентов</p>'}</div>
     <div class="search">${I.plus}<input id="ed-search" data-input="edSearch" placeholder="Добавить ингредиент…" autocomplete="off" value="${esc(ed.q)}"></div>
-    <div class="suggest inline" id="ed-suggest">${edSuggest()}</div>
+    <div class="suggest inline" id="ed-suggest">${edSuggest()}</div>`}
     ${np ? newProductForm(np) : ''}
+    <label class="field-label">Заметка</label>
+    <textarea class="input ed-note" data-input="edNote" rows="2" placeholder="Например: добавить кинзу, меньше соли, подавать с лимоном">${esc(d.note || '')}</textarea>
     <div class="btn-col"><button class="btn primary wide" data-act="edSave">${I.check}<span>Сохранить блюдо</span></button></div>`;
 }
 
@@ -638,7 +742,7 @@ function edSuggest() {
 
 function newProductForm(np) {
   return `<section class="card np-form">
-    <h4>Новый продукт</h4>
+    <h4>${np.id ? 'Продукт' : 'Новый продукт'}</h4>
     <input class="input" data-input="np" data-k="name" value="${esc(np.name)}" placeholder="Название">
     <div class="row2">
       <label class="sel"><span>Отдел</span><select data-change="np" data-k="cat">${CAT_ORDER.map(c => `<option value="${c}" ${np.cat === c ? 'selected' : ''}>${CATS[c].emoji} ${CATS[c].name}</option>`).join('')}</select></label>
@@ -647,7 +751,7 @@ function newProductForm(np) {
     ${np.unit === 'pcs' ? `<label class="sel"><span>Вес одной штуки, г</span><input class="input" type="number" inputmode="decimal" data-input="np" data-k="w" value="${np.w || ''}"></label>` : ''}
     <small class="muted">КБЖУ на 100 г (можно оставить пустым)</small>
     <div class="row4">${[['kcal', 'ккал'], ['p', 'Б'], ['f', 'Ж'], ['c', 'У']].map(([k, l]) => `<label class="mini-in"><input type="number" inputmode="decimal" data-input="np" data-k="${k}" value="${np[k] || ''}" placeholder="0"><span>${l}</span></label>`).join('')}</div>
-    <div class="btn-row"><button class="btn ghost grow" data-act="npCancel">Отмена</button><button class="btn primary grow" data-act="npSave">Добавить</button></div>
+    <div class="btn-row"><button class="btn ghost grow" data-act="npCancel">Отмена</button><button class="btn primary grow" data-act="npSave">${np.id ? 'Сохранить' : 'Добавить'}</button></div>
   </section>`;
 }
 
@@ -768,7 +872,7 @@ function wzDishes() {
   const pr = prefsOf(wz.wk);
   const liked = pr.like.length + pr.star.length;
   return `<div class="wz-head"><small>Шаг 1 · ${fmtRange(wz.wk)}</small><h2>Что хочется на этой неделе?</h2>
-      <p>Вправо — <b class="c-have">хочу</b>, влево — <b class="c-out">не сейчас</b>, вверх — <b class="c-low">обязательно</b>.</p></div>
+      <p>Вправо — <b class="c-have">хочу</b>, влево — <b class="c-out">не сейчас</b>, вверх — <b class="c-low">обязательно</b>. <button class="link" data-act="wzNewDish">+ Своя идея</button></p></div>
     <div class="deck" id="deck">${deckHTML()}</div>
     <div class="deck-btns">
       <button class="round undo" data-act="wzUndo" ${wz.hist.length ? '' : 'disabled'} aria-label="Вернуть">${I.undo}</button>
@@ -797,12 +901,14 @@ function deckHTML() {
     const n = dishNutr(d);
     cards.push(`<div class="tcard${k === 0 ? ' top' : ''}" data-k="${k}" style="--k:${k};--h:${hueOf(d.id)}">
       <div class="tc-stamp like">ХОЧУ</div><div class="tc-stamp nope">НЕ СЕЙЧАС</div><div class="tc-stamp star">ОБЯЗАТЕЛЬНО</div>
+      ${k === 0 ? `<div class="tc-acts"><button data-act="wzEditDish" aria-label="Изменить блюдо">${I.edit}</button><button data-act="wzDeleteDish" aria-label="Удалить навсегда">${I.trash}</button></div>` : ''}
       <div class="tc-art"><span>${d.emoji}</span></div>
       <div class="tc-info">
         <div class="tc-tags">${d.meals.map(m => `<span>${mealOf(m).emoji} ${mealOf(m).name}</span>`).join('')}${d.batch ? '<span>🗓 на неск. дней</span>' : ''}${isSeafood(d) ? '<span class="sea">🦐 только мне</span>' : ''}</div>
         <h3>${esc(d.name)}</h3>
         <div class="tc-kbju"><b>${num(n.kcal)} ккал</b><i class="p">Б ${r0(n.p)}</i><i class="f">Ж ${r0(n.f)}</i><i class="c">У ${r0(n.c)}</i></div>
         <p class="tc-ing">${esc(d.ing.map(i => product(i.pid)?.name).filter(Boolean).join(' · '))}</p>
+        ${d.note ? `<p class="tc-note">📝 ${esc(d.note)}</p>` : ''}
       </div></div>`);
   }
   return cards.join('') + `<div class="deck-left">${left} ${plural(left, 'блюдо', 'блюда', 'блюд')}</div>`;
@@ -814,7 +920,7 @@ function bindDeck() {
   let sx = 0, sy = 0, dx = 0, dy = 0, drag = false;
   const clamp = v => Math.max(0, Math.min(1, v));
   card.addEventListener('pointerdown', e => {
-    if (wz.busy) return;
+    if (wz.busy || e.target.closest('.tc-acts')) return;
     drag = true; sx = e.clientX; sy = e.clientY; dx = dy = 0;
     card.setPointerCapture(e.pointerId);
     card.classList.add('drag');
@@ -862,16 +968,17 @@ function swipe(v) {
 
 // Шаг 2 — кладовка
 function wzPantry() {
-  const { pantry, chosen } = wizardNeeds(wz.wk);
+  const { pantry } = wizardNeeds(wz.draft);
   const need = pantry.filter(x => state.pantry[x.p.id] !== 'have').length;
   const items = pantry.sort((a, b) => a.p.name.localeCompare(b.p.name, 'ru'));
   return `<div class="wz-head"><small>Шаг 2</small><h2>Проверим кладовку</h2>
-      <p>${chosen ? `Для выбранных блюд нужны эти запасы.` : 'Запасы, которые используются в блюдах.'} Нажмите на то, что <b class="c-low">заканчивается</b> или чего <b class="c-out">нет</b> — это попадёт в список покупок.</p></div>
-    ${items.length ? `<div class="pantry-grid">${items.map(({ p, dishes }) => {
+      <p>Меню на неделю уже прикинуто — вот сколько запасов на него уйдёт. Нажмите на то, что <b class="c-low">заканчивается</b> или чего <b class="c-out">нет</b> — это попадёт в список покупок.</p></div>
+    ${items.length ? `<div class="pantry-grid">${items.map(({ p, qty, dishes }) => {
       const st = state.pantry[p.id];
       return `<button class="jar ${st}" data-act="wzPantryCycle" data-pid="${p.id}">
         <span class="jar-name">${PRODUCT_EMOJI[p.id] || ''} ${esc(p.name)}</span><span class="jar-st"><i></i>${STATUS[st]}</span>
-        <span class="jar-for">${esc([...new Set(dishes)].slice(0, 2).join(', '))}</span></button>`;
+        <span class="jar-need">на неделю <b>${fmtQty(p, qty)}</b></span>
+        <span class="jar-for">${esc(dishes.slice(0, 2).join(', '))}${dishes.length > 2 ? ` +${dishes.length - 2}` : ''}</span></button>`;
     }).join('')}</div>` : empty('🫙', 'Запасы не нужны', 'Для выбранных блюд ничего из кладовки не требуется.')}
     <div class="wz-foot sticky">
       <div class="wz-count">${need ? `<span class="c-out">купить: ${need}</span>` : '<span class="c-have">всё есть ✓</span>'}</div>
@@ -881,7 +988,7 @@ function wzPantry() {
 
 // Шаг 3 — холодильник
 function wzFridge() {
-  const { fresh, chosen } = wizardNeeds(wz.wk);
+  const { fresh } = wizardNeeds(wz.draft);
   const hidden = shopState(wz.wk).hidden;
   const ids = new Set(fresh.map(x => x.p.id));
   const extra = Object.keys(hidden).map(id => product(id)).filter(p => p && !ids.has(p.id) && !state.pantry[p.id]);
@@ -890,10 +997,10 @@ function wzFridge() {
     const items = fresh.filter(x => x.p.cat === cat).sort((a, b) => a.p.name.localeCompare(b.p.name, 'ru'));
     if (!items.length) return '';
     return `<h3 class="group-title"><span>${CATS[cat].emoji}</span>${CATS[cat].name}</h3>
-      <div class="fridge-grid">${items.map(({ p }) => fridgeChip(p, !!hidden[p.id])).join('')}</div>`;
+      <div class="fridge-grid">${items.map(({ p, qty }) => fridgeChip(p, !!hidden[p.id], qty)).join('')}</div>`;
   }).join('');
   return `<div class="wz-head"><small>Шаг 3</small><h2>Что уже есть в холодильнике?</h2>
-      <p>Отметьте продукты, которых дома хватит на ${chosen ? 'выбранные блюда' : 'неделю'}. Их не будет в списке покупок, а блюда с ними попадут в меню охотнее.</p></div>
+      <p>Под каждым продуктом — сколько нужно на неделю на двоих. Отметьте то, чего дома хватит: его не будет в списке покупок.</p></div>
     <div class="add-row wz-search">
       <div class="search">${I.search}<input id="wz-search" data-input="wzSearch" placeholder="Есть что-то ещё? Например, шпинат" autocomplete="off" value="${esc(wz.q)}"></div>
       <div class="suggest" id="wz-suggest">${wzSuggest()}</div>
@@ -906,9 +1013,9 @@ function wzFridge() {
     </div>`;
 }
 
-function fridgeChip(p, on) {
+function fridgeChip(p, on, qty) {
   return `<button class="fridge${on ? ' on' : ''}" data-act="wzFridge" data-pid="${p.id}">
-    <span class="fr-emoji">${PRODUCT_EMOJI[p.id] || CATS[p.cat].emoji}</span><span class="fr-name">${esc(p.name)}</span>
+    <span class="fr-emoji">${PRODUCT_EMOJI[p.id] || CATS[p.cat].emoji}</span><span class="fr-name">${esc(p.name)}${qty ? `<small>нужно ${fmtQty(p, qty)}</small>` : ''}</span>
     <span class="fr-check">${I.check}</span></button>`;
 }
 
@@ -923,20 +1030,27 @@ function wzSuggest() {
 // Шаг 4 — итог
 function wzDone() {
   const pr = prefsOf(wz.wk);
-  const { pantry } = wizardNeeds(wz.wk);
+  const { pantry } = wizardNeeds(wz.draft);
   const buy = pantry.filter(x => state.pantry[x.p.id] !== 'have').length;
   const home = Object.keys(shopState(wz.wk).hidden).length;
   const hasPlan = planOf(wz.wk).length > 0;
+  const dishesN = new Set(wz.draft.map(e => e.dishId)).size;
   const tile = (emoji, n, label, cls) => `<div class="wz-tile ${cls}"><span>${emoji}</span><b>${n}</b><small>${label}</small></div>`;
-  return `<div class="wz-head center-text"><div class="wz-hero">✨</div><small>Шаг 4 · ${fmtRange(wz.wk)}</small><h2>Всё готово к планированию</h2>
-      <p>Составлю меню на 7 дней под ваши цели по КБЖУ: чаще возьму то, что вы выбрали, и то, что есть дома.</p></div>
+  const g = p => kcalOf(state.settings.goals[p]);
+  return `<div class="wz-head center-text"><div class="wz-hero">✨</div><small>Шаг 4 · ${fmtRange(wz.wk)}</small><h2>Меню на неделю готово</h2>
+      <p>${dishesN} ${plural(dishesN, 'блюдо', 'блюда', 'блюд')} под ваши цели по КБЖУ. Сохраните его или попросите другой вариант — он учтёт и то, что есть дома.</p></div>
+    <div class="wz-kcal">
+      <div class="me"><small>${esc(names().me)} · в среднем</small><b>${num(planAvgKcal(wz.draft, 'me'))}</b><span>из ${num(g('me'))} ккал</span></div>
+      <div class="him"><small>${esc(names().him)} · в среднем</small><b>${num(planAvgKcal(wz.draft, 'him'))}</b><span>из ${num(g('him'))} ккал</span></div>
+    </div>
     <div class="wz-tiles">
       ${tile('♥', pr.like.length, 'хочу', 'like')}${tile('★', pr.star.length, 'обязательно', 'star')}${tile('✕', pr.nope.length, 'не сейчас', 'nope')}
       ${tile('🫙', buy, 'докупить запасов', 'jar')}${tile('🏠', home, 'есть дома', 'home')}${tile('🍽', state.settings.factor.toFixed(1).replace('.', ','), 'порция мужа ×', 'him')}
     </div>
     ${hasPlan ? '<div class="alert">Текущее меню этой недели заменится новым.</div>' : ''}
-    <div class="btn-col"><button class="btn primary wide big" data-act="wzBuild">${I.spark}<span>Составить меню</span></button>
-    <button class="btn ghost wide" data-act="wzResetPrefs">${I.undo}<span>Сбросить выбор блюд</span></button></div>`;
+    <div class="btn-col"><button class="btn primary wide big" data-act="wzBuild">${I.check}<span>Сохранить меню</span></button>
+    <button class="btn ghost wide" data-act="wzReroll">🎲<span>Другой вариант</span></button>
+    <button class="btn ghost wide small" data-act="wzResetPrefs">${I.undo}<span>Сбросить выбор блюд</span></button></div>`;
 }
 
 // ---------- Действия ----------
@@ -944,8 +1058,27 @@ const A = {
   // мастер планирования
   wzClose: closeWizard,
   wzBack() { if (wz.step > 0) { wz.step--; renderWizard(); } },
-  wzNext() { if (wz.step < 3) { wz.step++; renderWizard(); } },
+  wzNext() {
+    if (wz.step >= 3) return;
+    if (wz.step === 0) {
+      const sig = JSON.stringify(prefsOf(wz.wk));
+      if (!wz.draft || wz.sig !== sig) { wz.draft = buildPlan(wz.wk); wz.sig = sig; }
+    }
+    wz.step++; renderWizard();
+  },
+  wzReroll() { wz.draft = buildPlan(wz.wk); buzz(); renderWizard(true); toast('Вот другой вариант 🎲'); },
   wzSwipe(el) { swipe(el.dataset.v); },
+  wzEditDish() { openEditor(wz.deck[wz.i], { after: 'wizard' }); },
+  wzNewDish() { openEditor(null, { after: 'wizard' }); },
+  wzDeleteDish() {
+    const id = wz.deck[wz.i];
+    const d = dish(id);
+    if (!d) return;
+    const undo = removeDish(id);
+    wz.deck.splice(wz.i, 1);
+    save(); renderWizard();
+    toast(`«${d.name}» удалено навсегда`, { label: 'Вернуть', fn: () => { undo(); if (wz) { wz.deck.splice(wz.i, 0, id); renderWizard(); } update(); } });
+  },
   wzUndo() {
     const h = wz.hist.pop();
     if (!h) return;
@@ -961,7 +1094,7 @@ const A = {
   wzResetPrefs() {
     state.prefs[wz.wk] = { like: [], star: [], nope: [] };
     wz.deck = shuffleArr(state.dishes.filter(d => d.ing.length).map(d => d.id));
-    wz.i = 0; wz.hist = []; wz.step = 0; renderWizard(); save();
+    wz.i = 0; wz.hist = []; wz.step = 0; wz.draft = null; renderWizard(); save();
   },
   wzPantryCycle(el) { const p = el.dataset.pid; state.pantry[p] = NEXT[state.pantry[p]]; buzz(); save(); renderWizard(true); },
   wzFridge(el) {
@@ -975,7 +1108,7 @@ const A = {
   },
   wzBuild() {
     const wk = wz.wk;
-    autoplanWeek(wk);
+    state.plans[wk] = wz.draft || buildPlan(wk);
     closeWizard();
     ui.tab = 'menu'; ui.weekOffset = Math.round((parseISO(wk) - parseISO(weekKeyOffset(0))) / (7 * 864e5));
     save(); saveUI(); render(); window.scrollTo(0, 0);
@@ -1088,14 +1221,30 @@ const A = {
   openDish(el) { openDish(el.dataset.id); },
   newDish() { openEditor(null); },
   editDish(el) { openEditor(el.dataset.id); },
+  copyDish(el) { openEditor(el.dataset.id, { copy: true }); },
   deleteDish(el) {
-    const id = el.dataset.id;
-    const d = dish(id);
-    confirmSheet(`Удалить «${esc(d.name)}»?`, 'Блюдо пропадёт из списка и из всех недель меню.', 'Удалить', () => {
-      state.dishes = state.dishes.filter(x => x.id !== id);
-      for (const wk of Object.keys(state.plans)) state.plans[wk] = state.plans[wk].filter(e => e.dishId !== id);
-      update(); toast('Блюдо удалено');
-    });
+    const d = dish(el.dataset.id);
+    const undo = removeDish(d.id);
+    closeSheet(); update();
+    toast(`«${d.name}» удалено`, { label: 'Вернуть', fn: () => { undo(); update(); } });
+  },
+  toastAction() {
+    const f = toastFn; toastFn = null;
+    $('#toast').classList.remove('show');
+    f && f();
+  },
+  draftRecipe() { openEditor(draft.e.dishId, { after: 'none' }); },
+  edMode(el) {
+    const m = el.dataset.m;
+    if (m === ed.mode) return;
+    if (m === 'list') applyEdText(); else ed.text = ingredientsToText(ed.d.ing);
+    ed.mode = m; ed.np = null; refreshSheet();
+  },
+  edEditProduct(el) {
+    const p = product(el.dataset.pid);
+    ed.np = { id: p.id, name: p.name, cat: p.cat, unit: p.unit, w: p.w, kcal: p.kcal || '', p: p.p || '', f: p.f || '', c: p.c || '' };
+    refreshSheet();
+    setTimeout(() => sheet?.wrap.querySelector('.np-form')?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 50);
   },
   edEmojiToggle() { ed.emojiOpen = !ed.emojiOpen; refreshSheet(); },
   edEmoji(el) { ed.d.emoji = el.dataset.e; ed.emojiOpen = false; refreshSheet(); },
@@ -1120,16 +1269,23 @@ const A = {
   npSave() {
     const np = ed.np;
     if (!np.name.trim()) { toast('Введите название продукта'); return; }
-    const id = 'c_' + uid();
     const n = v => Math.max(0, Number(String(v).replace(',', '.')) || 0);
-    state.customProducts.push({ id, name: np.name.trim(), cat: np.cat, unit: np.unit, w: n(np.w) || 100, kcal: n(np.kcal), p: n(np.p), f: n(np.f), c: n(np.c), staple: false, seafood: false, ul: null });
+    const fields = { name: np.name.trim(), cat: np.cat, unit: np.unit, w: n(np.w) || 100, kcal: n(np.kcal), p: n(np.p), f: n(np.f), c: n(np.c) };
+    if (np.id) {
+      Object.assign(state.customProducts.find(x => x.id === np.id), fields);
+    } else {
+      const id = 'c_' + uid();
+      state.customProducts.push({ id, ...fields, staple: false, seafood: false, ul: null });
+      ed.d.ing.push({ pid: id, qty: np.unit === 'pcs' ? 1 : 100 });
+    }
     invalidateProducts();
-    ed.d.ing.push({ pid: id, qty: np.unit === 'pcs' ? 1 : 100 });
     ed.np = null; ed.q = ''; save(); refreshSheet();
   },
   edSave() {
+    if (ed.mode === 'text') applyEdText();
     const d = ed.d;
     d.name = d.name.trim();
+    d.note = (d.note || '').trim();
     if (!d.name) return toast('Введите название блюда');
     if (!d.meals.length) return toast('Выберите, когда едим это блюдо');
     if (!d.ing.length) return toast('Добавьте хотя бы один ингредиент');
@@ -1142,8 +1298,10 @@ const A = {
       state.dishes.unshift(d);
     }
     const id = d.id;
+    const after = ed.after;
     closeSheet(); update(); toast('Блюдо сохранено');
-    setTimeout(() => openDish(id), 340);
+    if (wz) { if (after === 'wizard' && !wz.deck.includes(id)) wz.deck.splice(wz.i, 0, id); renderWizard(); }
+    else if (after === 'dish') setTimeout(() => openDish(id), 340);
   },
 
   // траты
@@ -1222,6 +1380,8 @@ const INPUT = {
     saveUI();
   },
   edName(el) { ed.d.name = el.value; },
+  edNote(el) { ed.d.note = el.value; },
+  edText(el) { ed.text = el.value; $('#ed-parse').innerHTML = edTextPreview(); $('#ed-nutr').innerHTML = editorNutr(); },
   edQty(el) {
     ed.d.ing[Number(el.dataset.i)].qty = Math.max(0, Number(el.value.replace(',', '.')) || 0);
     $('#ed-nutr').innerHTML = editorNutr();

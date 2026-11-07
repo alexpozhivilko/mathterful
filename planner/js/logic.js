@@ -77,14 +77,42 @@ export function entryNutr(e, person) {
   return { kcal: n.kcal * m, p: n.p * m, f: n.f * m, c: n.c * m };
 }
 
-export function dayNutr(wk, day, person) {
+export const dayNutr = (wk, day, person) => planDayNutr(planOf(wk), day, person);
+export function planDayNutr(plan, day, person) {
   const t = { kcal: 0, p: 0, f: 0, c: 0 };
-  for (const e of planOf(wk)) {
+  for (const e of plan) {
     if (!covers(e, day) || !forPerson(e, person)) continue;
     const n = entryNutr(e, person);
     t.kcal += n.kcal; t.p += n.p; t.f += n.f; t.c += n.c;
   }
   return t;
+}
+
+// Средние калории в день по меню (по дням, где что-то запланировано)
+export function planAvgKcal(plan, person) {
+  const days = [0, 1, 2, 3, 4, 5, 6].filter(i => plan.some(e => covers(e, i) && forPerson(e, person)));
+  return days.length ? days.reduce((a, i) => a + planDayNutr(plan, i, person).kcal, 0) / days.length : 0;
+}
+
+// Сколько каждого продукта нужно на всё меню (на двоих, с учётом дней и порций)
+export function planNeeds(plan) {
+  const f = state.settings.factor;
+  const m = new Map();
+  for (const e of plan) {
+    const d = dish(e.dishId);
+    if (!d) continue;
+    const span = Math.min(e.span, 7 - e.day);
+    const portions = e.mult * span * (e.who === 'both' ? 1 + f : e.who === 'me' ? 1 : f);
+    for (const i of d.ing) {
+      const pr = product(i.pid);
+      if (!pr) continue;
+      if (!m.has(pr.id)) m.set(pr.id, { p: pr, qty: 0, dishes: new Set() });
+      const x = m.get(pr.id);
+      x.qty += i.qty * portions;
+      x.dishes.add(d.name);
+    }
+  }
+  return m;
 }
 
 // ---------- Список покупок ----------
@@ -105,30 +133,18 @@ export function fmtQty(pr, qty) {
 
 export function shoppingList(wk) {
   const sh = shopState(wk);
-  const f = state.settings.factor;
   const items = new Map();
   const get = (key, pr) => {
     if (!items.has(key)) items.set(key, { key, pid: pr.id, name: pr.name, cat: pr.cat, qty: 0, dishes: new Set(), pantry: null, manual: false });
     return items.get(key);
   };
 
-  for (const e of planOf(wk)) {
-    const d = dish(e.dishId);
-    if (!d) continue;
-    const span = Math.min(e.span, 7 - e.day);
-    const portions = e.mult * span * (e.who === 'both' ? 1 + f : e.who === 'me' ? 1 : f);
-    for (const i of d.ing) {
-      const pr = product(i.pid);
-      if (!pr) continue;
-      const status = state.pantry[pr.id];
-      if (status) {
-        if (status !== 'have') get(pr.id, pr).dishes.add(d.name);
-        continue; // запасы из кладовки берём по статусу, а не по меню
-      }
-      const it = get(pr.id, pr);
-      it.qty += i.qty * portions;
-      it.dishes.add(d.name);
-    }
+  for (const [pid, x] of planNeeds(planOf(wk))) {
+    const status = state.pantry[pid];
+    if (status === 'have') continue; // запасы из кладовки берём по статусу, а не по меню
+    const it = get(pid, x.p);
+    it.qty += x.qty;
+    x.dishes.forEach(n => it.dishes.add(n));
   }
   for (const [pid, status] of Object.entries(state.pantry)) {
     if (status === 'have') continue;
@@ -136,7 +152,7 @@ export function shoppingList(wk) {
     if (!pr) continue;
     const it = get(pid, pr);
     it.pantry = status;
-    it.qty = null;
+    if (!it.qty) it.qty = null;
   }
   for (const m of sh.manual) {
     const pr = m.pid ? product(m.pid) : null;
@@ -244,7 +260,10 @@ function generateDay(plan, day, dishes, used, ctx) {
   }
 }
 
-export function autoplanWeek(wk) {
+export function autoplanWeek(wk) { state.plans[wk] = buildPlan(wk); }
+
+// Составить меню недели (не сохраняя его)
+export function buildPlan(wk) {
   const ctx = context(wk);
   const dishes = ctx.shared;
   const plan = [];
@@ -289,7 +308,7 @@ export function autoplanWeek(wk) {
     e.who = 'him';
     plan.push(mk(e.day, e.meal, d, 1, 'me'));
   }
-  state.plans[wk] = plan;
+  return plan;
 }
 
 export function shuffleDay(wk, day) {
@@ -299,20 +318,13 @@ export function shuffleDay(wk, day) {
   state.plans[wk] = plan;
 }
 
-// Продукты, нужные для выбранных в «тиндере» блюд
-export function wizardNeeds(wk) {
-  const ctx = context(wk);
-  const chosen = state.dishes.filter(d => ctx.like.has(d.id) || ctx.star.has(d.id));
-  const src = chosen.length ? chosen : ctx.all;
-  const pantry = new Map(), fresh = new Map();
-  for (const d of src) for (const i of d.ing) {
-    const pr = product(i.pid);
-    if (!pr) continue;
-    const m = state.pantry[pr.id] ? pantry : fresh;
-    if (!m.has(pr.id)) m.set(pr.id, { p: pr, dishes: [] });
-    m.get(pr.id).dishes.push(d.name);
+// Продукты для черновика меню: запасы из кладовки и свежие, с количеством на неделю
+export function wizardNeeds(plan) {
+  const pantry = [], fresh = [];
+  for (const x of planNeeds(plan).values()) {
+    (state.pantry[x.p.id] ? pantry : fresh).push({ p: x.p, qty: x.qty, dishes: [...x.dishes] });
   }
-  return { chosen: chosen.length, pantry: [...pantry.values()], fresh: [...fresh.values()] };
+  return { pantry, fresh };
 }
 
 // ---------- Траты ----------

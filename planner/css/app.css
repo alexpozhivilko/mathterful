@@ -642,3 +642,54 @@ label.btn { cursor: pointer; }
   .tc-tags { display: none; }
   .tc-info { padding-top: 6px; }
 }
+
+/* ---------- Свободный ввод и удаление ---------- */
+.sheet-wrap { z-index: 70; }
+.toast.has-action { pointer-events: auto; display: flex; align-items: center; gap: 14px; }
+.toast button { color: #c4b5fd; font-weight: 800; padding: 4px 2px; white-space: nowrap; }
+.link { color: #c4b5fd; font-weight: 700; font-size: 12.5px; padding: 2px 0; text-align: left; }
+.ing-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; }
+.ing-head .field-label { margin-bottom: 10px; }
+.seg.mini { padding: 3px; margin-bottom: 6px; flex: none; }
+.seg.mini button { height: 30px; font-size: 13px; padding: 0 10px; }
+textarea.input { height: auto; padding: 12px 14px; line-height: 1.5; resize: vertical; font-family: inherit; }
+.ed-text { min-height: 150px; }
+.ed-note { min-height: 64px; }
+.parse { margin-bottom: 4px; }
+.parse .item-sub .pill { margin-right: 4px; }
+.note { margin: 4px 0 6px; padding: 12px 14px; border-radius: 14px; background: rgba(139, 92, 246, .1); border: 1px solid rgba(139, 92, 246, .25); font-size: 14px; color: #ddd6fe; }
+.tc-acts { position: absolute; top: 12px; right: 12px; z-index: 4; display: flex; gap: 8px; }
+.tc-acts button { width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center; background: rgba(11, 12, 18, .45); border: 1px solid rgba(255, 255, 255, .14); color: #e5e7f0; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+.tc-acts button:active { transform: scale(.92); }
+.tc-acts svg { width: 18px; height: 18px; }
+.tc-note { margin: 6px 0 0; font-size: 12.5px; color: #ddd6fe; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
+.wz-head .link { font-size: 13px; }
+.toast.has-action { width: calc(100% - 32px); max-width: 460px; justify-content: space-between; }
+.toast.has-action span { min-width: 0; }
+.seg.mini button { flex: none; overflow: visible; }
+.ing-head .field-label { min-width: 0; }
+
+/* ---------- Граммовка ---------- */
+.ing-table { padding: 6px 4px; }
+.it-row { display: grid; grid-template-columns: minmax(0, 1fr) repeat(var(--cols), minmax(58px, auto)); gap: 6px; align-items: center; padding: 8px 10px; font-size: 14px; }
+.it-row + .it-row { border-top: 1px solid var(--line); }
+.it-row > span:not(.it-name), .it-row > b { text-align: right; white-space: nowrap; font-weight: 700; }
+.it-row.head b { font-size: 11.5px; text-transform: uppercase; letter-spacing: .04em; white-space: normal; line-height: 1.2; }
+.it-row .me { color: var(--me); } .it-row .him { color: var(--him); } .it-row .tot { color: var(--text); }
+.it-row.head .tot { color: var(--muted); }
+.it-row:not(.head):not(.foot) .me, .it-row:not(.head):not(.foot) .him { color: var(--text); }
+.it-name { display: flex; align-items: center; gap: 8px; font-weight: 600; min-width: 0; }
+.it-name i { font-style: normal; width: 22px; text-align: center; flex: none; }
+.it-row.foot { background: rgba(255, 255, 255, .03); border-radius: 0 0 16px 16px; }
+.it-row.foot .it-name { color: var(--muted); font-weight: 700; }
+.entry-head + .nutr-pair { margin-top: 0; margin-bottom: 4px; }
+.jar-need { font-size: 11.5px; color: var(--muted); font-weight: 600; }
+.jar-need b { color: var(--text); }
+.fr-name small { display: block; font-size: 11px; font-weight: 600; color: var(--dim); margin-top: 1px; }
+.fridge.on .fr-name small { color: var(--muted); }
+.wz-kcal { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 16px; }
+.wz-kcal > div { display: flex; flex-direction: column; padding: 12px 14px; border-radius: 18px; background: var(--surface); border: 1px solid var(--line); }
+.wz-kcal small { font-weight: 700; } .wz-kcal .me small { color: var(--me); } .wz-kcal .him small { color: var(--him); }
+.wz-kcal b { font-size: 24px; }
+.wz-kcal span { color: var(--muted); font-size: 12px; font-weight: 600; }
+.fr-name, .jar-name, .it-name, .chip-name, .dish-card b { -webkit-hyphens: auto; hyphens: auto; overflow-wrap: break-word; }
