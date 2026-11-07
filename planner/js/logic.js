@@ -308,13 +308,25 @@ export function buildPlan(wk) {
     e.who = 'him';
     plan.push(mk(e.day, e.meal, d, 1, 'me'));
   }
+  markAuto(plan, ctx);
   return plan;
+}
+
+// Отметить блюда, которые подобраны автоматически (не из «хочу» / «обязательно»)
+function markAuto(entries, ctx) {
+  if (!ctx.like.size && !ctx.star.size) return;
+  for (const e of entries) {
+    if (ctx.like.has(e.dishId) || ctx.star.has(e.dishId)) delete e.auto;
+    else e.auto = true;
+  }
 }
 
 export function shuffleDay(wk, day) {
   const plan = planOf(wk).filter(e => !(e.day === day && e.span === 1));
   const ctx = context(wk);
+  const before = new Set(plan.map(e => e.id));
   generateDay(plan, day, ctx.shared, usedCounts(plan), ctx);
+  markAuto(plan.filter(e => !before.has(e.id)), ctx);
   state.plans[wk] = plan;
 }
 

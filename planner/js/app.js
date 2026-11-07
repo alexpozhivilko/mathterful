@@ -128,7 +128,7 @@ function viewMenu() {
     </div>
   </section>
   ${dates.map((d, i) => dayCard(wk, d, i, iso(d) === tKey)).join('')}
-  <p class="foot-hint">Нажмите на блюдо, чтобы изменить порцию, дни или для кого оно. 🎲 — пересобрать день.</p>`;
+  <p class="foot-hint">Нажмите на блюдо, чтобы изменить порцию, дни или для кого оно. 🎲 — пересобрать день.${plan.some(e => e.auto) ? ' ✨ — подобрано автоматически, не из вашего выбора.' : ''}</p>`;
 }
 
 function dayCard(wk, date, i, isToday) {
@@ -170,7 +170,7 @@ function chip(e, day) {
   return `<button class="chip${cont ? ' cont' : ''}${warn ? ' warn' : ''}" data-act="editEntry" data-id="${e.id}">
     <span class="chip-emoji">${d.emoji}</span>
     <span class="chip-body"><span class="chip-name">${esc(d.name)}</span><span class="chip-meta">${meta}</span></span>
-    <span class="chip-tags">${whoDots(e.who)}${e.span > 1 && !cont ? `<span class="tag">${e.span} ${plural(e.span, 'день', 'дня', 'дней')}</span>` : ''}${e.mult !== 1 && !cont ? `<span class="tag">×${String(e.mult).replace('.', ',')}</span>` : ''}${warn ? '<span class="tag warn">🦐</span>' : ''}</span>
+    <span class="chip-tags">${whoDots(e.who)}${e.span > 1 && !cont ? `<span class="tag">${e.span} ${plural(e.span, 'день', 'дня', 'дней')}</span>` : ''}${e.mult !== 1 && !cont ? `<span class="tag">×${String(e.mult).replace('.', ',')}</span>` : ''}${warn ? '<span class="tag warn">🦐</span>' : ''}${e.auto && !cont ? '<span class="tag auto" title="Подобрано автоматически">✨</span>' : ''}</span>
   </button>`;
 }
 
@@ -540,6 +540,7 @@ function entrySheet() {
       ${e.who !== 'him' ? `<div class="np me"><small>${esc(nmz.me)} · порция ${fmtAmt(null, portionWeight(d, e.mult))}</small><b>${num(nm.kcal)} ккал</b><span>Б ${r0(nm.p)} · Ж ${r0(nm.f)} · У ${r0(nm.c)}</span></div>` : ''}
       ${e.who !== 'me' ? `<div class="np him"><small>${esc(nmz.him)} · порция ${fmtAmt(null, portionWeight(d, e.mult * state.settings.factor))}</small><b>${num(nh.kcal)} ккал</b><span>Б ${r0(nh.p)} · Ж ${r0(nh.f)} · У ${r0(nh.c)}</span></div>` : ''}
     </div>
+    ${e.auto ? `<div class="auto-note">✨ Это блюдо подобрано автоматически — его не было в вашем выборе. Не нравится — нажмите «Заменить».</div>` : ''}
     ${ingTable(d, e)}
     ${d.note ? `<div class="note">📝 ${esc(d.note)}</div>` : ''}
     <label class="field-label">Для кого</label>
@@ -1027,6 +1028,40 @@ function wzSuggest() {
     .map(p => `<button class="sug" data-act="wzFridgeAdd" data-pid="${p.id}"><span>${PRODUCT_EMOJI[p.id] || CATS[p.cat].emoji}</span>${esc(p.name)}</button>`).join('');
 }
 
+// Сколько блюд в черновике из выбора, а сколько добавлено автоматически
+function wzMix(pr) {
+  const chosen = new Set([...pr.like, ...pr.star]);
+  const ids = [...new Set(wz.draft.map(e => e.dishId))];
+  if (!chosen.size) return `<div class="wz-mix"><p>✨ Вы не выбирали блюда — всё меню подобрано автоматически. В меню можно заменить любое блюдо.</p></div>`;
+  const mine = ids.filter(id => chosen.has(id)).length;
+  const auto = ids.length - mine;
+  const missed = [...chosen].map(id => dish(id)).filter(d => d && !ids.includes(d.id));
+  const pct = ids.length ? (mine / ids.length) * 100 : 0;
+  return `<div class="wz-mix">
+    <div class="mix-bar"><i class="mine" style="width:${pct}%"></i><i class="auto" style="width:${100 - pct}%"></i></div>
+    <div class="mix-legend">
+      <span class="mine"><b>${mine}</b> ${plural(mine, 'блюдо', 'блюда', 'блюд')} из вашего выбора</span>
+      <span class="auto"><b>${auto}</b> подобрано автоматически ✨</span>
+    </div>
+    ${auto ? `<p>${mine < 8 ? 'Выбранных блюд на неделю не хватило, поэтому я добавил ещё. ' : ''}В меню они отмечены ✨ — их легко заменить.</p>` : ''}
+    ${repeatNote()}
+    ${missed.length ? `<p class="muted">Не поместились по КБЖУ: ${esc(missed.slice(0, 3).map(d => d.name).join(', '))}${missed.length > 3 ? ` и ещё ${missed.length - 3}` : ''}. Их можно добавить вручную или нажать «Другой вариант».</p>` : ''}
+  </div>`;
+}
+
+// Повторы и пустые приёмы пищи в черновике
+function repeatNote() {
+  const plan = wz.draft;
+  const ids = new Set(plan.map(e => e.dishId));
+  const slots = [0, 1, 2, 3, 4, 5, 6].reduce((a, d) => a + ['b', 'l', 'd', 's'].filter(m => plan.some(e => e.meal === m && covers(e, d))).length, 0);
+  const emptyN = 28 - slots;
+  const out = [];
+  const repeats = plan.filter(e => e.span === 1).length - new Set(plan.filter(e => e.span === 1).map(e => e.dishId)).size;
+  if (repeats >= 4) out.push(`🔁 Блюда повторяются: ${ids.size} ${plural(ids.size, 'блюдо', 'блюда', 'блюд')} на всю неделю. Для разнообразия вернитесь к шагу 1 и отметьте ещё.`);
+  if (emptyN > 0) out.push(`⚠️ ${emptyN} ${plural(emptyN, 'приём', 'приёма', 'приёмов')} пищи без блюда — ${emptyN === 1 ? 'для него' : 'для них'} ничего не выбрано. ${emptyN === 1 ? 'Его' : 'Их'} можно заполнить в меню кнопкой «+».`);
+  return out.map(t => `<p class="warn-line">${t}</p>`).join('');
+}
+
 // Шаг 4 — итог
 function wzDone() {
   const pr = prefsOf(wz.wk);
@@ -1039,6 +1074,7 @@ function wzDone() {
   const g = p => kcalOf(state.settings.goals[p]);
   return `<div class="wz-head center-text"><div class="wz-hero">✨</div><small>Шаг 4 · ${fmtRange(wz.wk)}</small><h2>Меню на неделю готово</h2>
       <p>${dishesN} ${plural(dishesN, 'блюдо', 'блюда', 'блюд')} под ваши цели по КБЖУ. Сохраните его или попросите другой вариант — он учтёт и то, что есть дома.</p></div>
+    ${wzMix(pr)}
     <div class="wz-kcal">
       <div class="me"><small>${esc(names().me)} · в среднем</small><b>${num(planAvgKcal(wz.draft, 'me'))}</b><span>из ${num(g('me'))} ккал</span></div>
       <div class="him"><small>${esc(names().him)} · в среднем</small><b>${num(planAvgKcal(wz.draft, 'him'))}</b><span>из ${num(g('him'))} ккал</span></div>
@@ -1138,7 +1174,7 @@ const A = {
     const d = dish(el.dataset.id);
     if (pick.replaceId) {
       const e = planOf(curWeek()).find(x => x.id === pick.replaceId);
-      if (e) { draft.e.dishId = d.id; openEntry(draft.e, false); }
+      if (e) { draft.e.dishId = d.id; delete draft.e.auto; openEntry(draft.e, false); }
       return;
     }
     const span = d.batch && pick.meal !== 'b' && pick.meal !== 's' ? Math.min(2, 7 - pick.day) : 1;

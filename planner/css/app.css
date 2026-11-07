@@ -693,3 +693,20 @@ textarea.input { height: auto; padding: 12px 14px; line-height: 1.5; resize: ver
 .wz-kcal b { font-size: 24px; }
 .wz-kcal span { color: var(--muted); font-size: 12px; font-weight: 600; }
 .fr-name, .jar-name, .it-name, .chip-name, .dish-card b { -webkit-hyphens: auto; hyphens: auto; overflow-wrap: break-word; }
+
+/* ---------- Выбранные и подобранные блюда ---------- */
+.tag.auto { background: rgba(139, 92, 246, .16); color: #c4b5fd; }
+.auto-note { margin: 4px 0 8px; padding: 10px 14px; border-radius: 14px; background: rgba(139, 92, 246, .1); border: 1px solid rgba(139, 92, 246, .25); color: #ddd6fe; font-size: 13.5px; }
+.wz-mix { margin-top: 16px; padding: 14px; border-radius: 18px; background: var(--surface); border: 1px solid var(--line); }
+.wz-mix p { margin: 10px 0 0; font-size: 13.5px; color: var(--text); }
+.wz-mix p.muted { color: var(--muted); }
+.wz-mix > p:first-child { margin-top: 0; }
+.mix-bar { display: flex; height: 10px; border-radius: 5px; overflow: hidden; background: rgba(255, 255, 255, .06); gap: 2px; }
+.mix-bar i { display: block; height: 100%; transition: width .5s var(--ease); }
+.mix-bar .mine { background: linear-gradient(90deg, #10b981, #34d399); }
+.mix-bar .auto { background: linear-gradient(90deg, #8b5cf6, #a78bfa); }
+.mix-legend { display: flex; justify-content: space-between; gap: 10px; margin-top: 8px; font-size: 12.5px; font-weight: 600; color: var(--muted); }
+.mix-legend .auto { text-align: right; }
+.mix-legend b { font-size: 15px; }
+.mix-legend .mine b { color: var(--have); } .mix-legend .auto b { color: #c4b5fd; }
+.wz-mix .warn-line { color: #fde68a; }
