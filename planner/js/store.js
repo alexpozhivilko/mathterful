@@ -27,6 +27,7 @@ function defaults() {
     ratings: {},         // dishId -> оценка после недели: 2 — лучшее, 1 — понравилось, -1 — не очень
     dismissed: [],       // рекомендации, от которых отказались
     reviewed: {},        // weekKey -> true, неделя уже оценена
+    eaten: {},           // weekKey -> { 'entryId:day': { me: true, him: true } } — что уже съели
   };
 }
 

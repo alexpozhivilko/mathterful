@@ -94,6 +94,52 @@ export function planAvgKcal(plan, person) {
   return days.length ? days.reduce((a, i) => a + planDayNutr(plan, i, person).kcal, 0) / days.length : 0;
 }
 
+// ---------- Съедено ----------
+const eatKey = (e, day) => `${e.id}:${day}`;
+export const whoOf = e => (e.who === 'both' ? ['me', 'him'] : [e.who]);
+// Отмечать можно только сегодняшние и прошедшие приёмы пищи
+export const canEat = (wk, day) => weekDates(wk)[day] <= today();
+export function isEaten(wk, e, day, person) {
+  const r = state.eaten?.[wk]?.[eatKey(e, day)];
+  return !!(r && r[person]);
+}
+// 'none' | 'part' | 'all' — для кого из тех, кому блюдо назначено
+export function eatState(wk, e, day) {
+  const ps = whoOf(e), n = ps.filter(p => isEaten(wk, e, day, p)).length;
+  return n === 0 ? 'none' : n === ps.length ? 'all' : 'part';
+}
+// Без person: если всё отмечено — снимаем отметку, иначе отмечаем всех
+export function toggleEaten(wk, e, day, person) {
+  state.eaten ||= {};
+  const W = (state.eaten[wk] ||= {});
+  const k = eatKey(e, day);
+  const r = { ...(W[k] || {}) };
+  if (person) r[person] = !r[person];
+  else { const on = eatState(wk, e, day) !== 'all'; whoOf(e).forEach(p => { r[p] = on; }); }
+  Object.keys(r).forEach(p => { if (!r[p]) delete r[p]; });
+  if (Object.keys(r).length) W[k] = r; else delete W[k];
+  return eatState(wk, e, day);
+}
+export function setDayEaten(wk, day, on) {
+  planOf(wk).filter(e => covers(e, day)).forEach(e => {
+    if ((eatState(wk, e, day) === 'all') !== on) toggleEaten(wk, e, day);
+  });
+}
+export function eatenNutr(wk, day, person) {
+  const t = { kcal: 0, p: 0, f: 0, c: 0 };
+  for (const e of planOf(wk)) {
+    if (!covers(e, day) || !forPerson(e, person) || !isEaten(wk, e, day, person)) continue;
+    const n = entryNutr(e, person);
+    t.kcal += n.kcal; t.p += n.p; t.f += n.f; t.c += n.c;
+  }
+  return t;
+}
+// Сколько приёмов пищи за день отмечено (считаем блюда, а не людей)
+export function dayEatenCount(wk, day) {
+  const es = planOf(wk).filter(e => covers(e, day));
+  return { done: es.filter(e => eatState(wk, e, day) === 'all').length, total: es.length };
+}
+
 // Сколько каждого продукта нужно на всё меню (на двоих, с учётом дней и порций)
 export function planNeeds(plan) {
   const f = state.settings.factor;

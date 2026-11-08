@@ -7,6 +7,7 @@ import {
   migrateWeekStart, kcalOf, dishNutr, isSeafood, planOf, covers, forPerson, entryNutr, dayNutr,
   shopState, shoppingList, fmtQty, autoplanWeek, shuffleDay, money, expensesByWeek, monthTotal, prefsOf, wizardNeeds,
   buildPlan, planNeeds, planAvgKcal, grams,
+  canEat, isEaten, eatState, toggleEaten, setDayEaten, eatenNutr, dayEatenCount, whoOf,
 } from './logic.js';
 
 // ---------- Иконки ----------
@@ -119,17 +120,27 @@ function viewMenu() {
     </div>`;
   }).join('');
 
+  const ti = dates.findIndex(d => iso(d) === tKey);
+  const todayBox = ti >= 0 && plan.some(e => covers(e, ti)) ? `<div class="today-eaten" data-act="dayStats" data-day="${ti}">
+      <small>Сегодня съедено</small>
+      ${['me', 'him'].map(p => {
+        const g = goalOf(p), n = eatenNutr(wk, ti, p);
+        return `<div class="te-row ${p}"><span>${esc(names()[p])}</span><div class="te-track"><i style="width:${Math.min(100, (n.kcal / g.kcal) * 100)}%"></i></div><b>${num(n.kcal)}<small> / ${num(g.kcal)}</small></b></div>`;
+      }).join('')}
+    </div>` : '';
+
   return `${reviewCard()}${weekNav()}
   <section class="card summary glow">
     <h3 class="card-title">В среднем за день</h3>
     <div class="sum-people">${people}</div>
+    ${todayBox}
     <div class="sum-actions">
       <button class="btn primary grow" data-act="autoplan">${I.spark}<span>${plan.length ? 'Пересобрать неделю' : 'Спланировать неделю'}</span></button>
       ${plan.length ? `<button class="btn ghost square" data-act="clearWeek" aria-label="Очистить неделю">${I.trash}</button>` : ''}
     </div>
   </section>
   ${dates.map((d, i) => dayCard(wk, d, i, iso(d) === tKey)).join('')}
-  <p class="foot-hint">Нажмите на блюдо, чтобы изменить порцию, дни или для кого оно. 🎲 — пересобрать день.${plan.some(e => e.auto) ? ' ✨ — подобрано автоматически, не из вашего выбора.' : ''}</p>`;
+  <p class="foot-hint">Нажмите на блюдо, чтобы изменить порцию, дни или для кого оно. Кружок ✓ справа — отметить, что съели. 🎲 — пересобрать день.${plan.some(e => e.auto) ? ' ✨ — подобрано автоматически, не из вашего выбора.' : ''}</p>`;
 }
 
 function dayCard(wk, date, i, isToday) {
@@ -148,9 +159,11 @@ function dayCard(wk, date, i, isToday) {
     </div>`;
   }).join('');
 
+  const ec = canEat(wk, i) ? dayEatenCount(wk, i) : null;
+  const eatPill = ec && ec.total ? `<span class="eat-pill${ec.done === ec.total ? ' full' : ''}">${I.check}${ec.done}/${ec.total}</span>` : '';
   return `<article class="card day${isToday ? ' today' : ''}" id="day-${i}">
     <header class="day-head">
-      <div class="day-title"><b>${WEEKDAYS[date.getDay()]}</b><small>${fmtDay(date)}${isToday ? ' · <em>сегодня</em>' : ''}</small></div>
+      <div class="day-title"><b>${WEEKDAYS[date.getDay()]}${eatPill}</b><small>${fmtDay(date)}${isToday ? ' · <em>сегодня</em>' : ''}</small></div>
       <button class="day-rings" data-act="dayStats" data-day="${i}" aria-label="КБЖУ за день">${rings}</button>
       <button class="icon-btn soft" data-act="shuffleDay" data-day="${i}" aria-label="Пересобрать день">${I.dice}</button>
     </header>
@@ -168,10 +181,13 @@ function chip(e, day) {
   const meta = cont
     ? `продолжение · с ${WD_SHORT[addDays(parseISO(curWeek()), e.day).getDay()]}`
     : `${num(n.kcal)} ккал · Б ${r0(n.p)}`;
-  return `<button class="chip${cont ? ' cont' : ''}${warn ? ' warn' : ''}" data-act="editEntry" data-id="${e.id}">
+  const wk = curWeek();
+  const eat = canEat(wk, day) ? eatState(wk, e, day) : null;
+  const eatBtn = eat ? `<span class="eat ${eat}" data-act="eatToggle" data-id="${e.id}" data-day="${day}" role="checkbox" aria-checked="${eat === 'all' ? 'true' : eat === 'part' ? 'mixed' : 'false'}" aria-label="Съедено">${I.check}</span>` : '';
+  return `<button class="chip${cont ? ' cont' : ''}${warn ? ' warn' : ''}${eat === 'all' ? ' eaten' : ''}" data-act="editEntry" data-id="${e.id}" data-day="${day}">
     <span class="chip-emoji">${d.emoji}</span>
     <span class="chip-body"><span class="chip-name">${esc(d.name)}</span><span class="chip-meta">${meta}</span></span>
-    <span class="chip-tags">${whoDots(e.who)}${e.span > 1 && !cont ? `<span class="tag">${e.span} ${plural(e.span, 'день', 'дня', 'дней')}</span>` : ''}${e.mult !== 1 && !cont ? `<span class="tag">×${String(e.mult).replace('.', ',')}</span>` : ''}${warn ? '<span class="tag warn">🦐</span>' : ''}${e.auto && !cont ? '<span class="tag auto" title="Подобрано автоматически">✨</span>' : ''}</span>
+    <span class="chip-tags">${whoDots(e.who)}${e.span > 1 && !cont ? `<span class="tag">${e.span} ${plural(e.span, 'день', 'дня', 'дней')}</span>` : ''}${e.mult !== 1 && !cont ? `<span class="tag">×${String(e.mult).replace('.', ',')}</span>` : ''}${warn ? '<span class="tag warn">🦐</span>' : ''}${e.auto && !cont ? '<span class="tag auto" title="Подобрано автоматически">✨</span>' : ''}</span>${eatBtn}
   </button>`;
 }
 
@@ -596,8 +612,8 @@ function pickList() {
 // ---------- Шторка: блюдо в меню ----------
 let draft = null; // { e, isNew }
 
-function openEntry(e, isNew) {
-  draft = { e: { ...e }, isNew };
+function openEntry(e, isNew, day = e.day) {
+  draft = { e: { ...e }, isNew, day };
   openSheet(entrySheet);
 }
 
@@ -618,6 +634,7 @@ function entrySheet() {
       ${e.who !== 'him' ? `<div class="np me"><small>${esc(nmz.me)} · порция ${fmtAmt(null, portionWeight(d, e.mult))}</small><b>${num(nm.kcal)} ккал</b><span>Б ${r0(nm.p)} · Ж ${r0(nm.f)} · У ${r0(nm.c)}</span></div>` : ''}
       ${e.who !== 'me' ? `<div class="np him"><small>${esc(nmz.him)} · порция ${fmtAmt(null, portionWeight(d, e.mult * state.settings.factor))}</small><b>${num(nh.kcal)} ккал</b><span>Б ${r0(nh.p)} · Ж ${r0(nh.f)} · У ${r0(nh.c)}</span></div>` : ''}
     </div>
+    ${eatBlock()}
     ${e.auto ? `<div class="auto-note">✨ Это блюдо подобрано автоматически — его не было в вашем выборе. Не нравится — нажмите «Заменить».</div>` : ''}
     ${ingTable(d, e)}
     ${d.note ? `<div class="note">📝 ${esc(d.note)}</div>` : ''}
@@ -641,6 +658,19 @@ function entrySheet() {
     </div>`;
 }
 
+
+// Отметка «съедено» в шторке блюда — для дня, на котором его открыли
+function eatBlock() {
+  const wk = curWeek(), e = planOf(wk).find(x => x.id === draft.e.id);
+  if (draft.isNew || !e || !canEat(wk, draft.day)) return '';
+  const date = weekDates(wk)[draft.day];
+  const nm = names();
+  const btns = whoOf(e).map(p => {
+    const on = isEaten(wk, e, draft.day, p);
+    return `<button class="eat-btn ${p}${on ? ' on' : ''}" data-act="eatPerson" data-p="${p}"><i>${I.check}</i><span>${esc(nm[p])}</span><small>${on ? 'съедено' : 'ещё нет'}</small></button>`;
+  }).join('');
+  return `<label class="field-label">Съедено · ${iso(date) === iso(today()) ? 'сегодня' : `${WD_SHORT[date.getDay()]}, ${fmtDay(date)}`}</label><div class="eat-row">${btns}</div>`;
+}
 
 // ---------- Граммовка ----------
 const dec = (v, k = 1) => String(Math.round(v * 10 ** k) / 10 ** k).replace('.', ',');
@@ -683,13 +713,22 @@ function openDayStats(day) {
     ${['me', 'him'].map(p => {
       const n = dayNutr(wk, day, p), g = goalOf(p);
       const left = g.kcal - n.kcal;
+      const eatLine = canEat(wk, day) && n.kcal ? (() => {
+        const en = eatenNutr(wk, day, p);
+        return `<div class="ds-eaten"><span>${I.check}Съедено</span><b>${num(en.kcal)}<small> / ${num(n.kcal)} ккал</small></b><small>Б ${r0(en.p)} · Ж ${r0(en.f)} · У ${r0(en.c)}</small></div>`;
+      })() : '';
       return `<section class="card day-stat ${p}">
+        ${eatLine}
         <div class="ds-top">${ring(n.kcal, g.kcal, p, `${Math.round((n.kcal / g.kcal) * 100)}%`, 76, 7)}
           <div><small>${esc(names()[p])}</small><b class="ds-k">${num(n.kcal)}<span> / ${num(g.kcal)} ккал</span></b>
           ${n.kcal === 0 ? '<span class="muted">пока ничего не запланировано</span>' : Math.abs(left) <= g.kcal * 0.05 ? '<span class="c-have">точно в цель 🎯</span>' : left > 0 ? `<span class="muted">ещё ${num(left)} ккал</span>` : `<span class="c-out">перебор ${num(-left)} ккал</span>`}</div></div>
         ${macroBar('Белки', n.p, g.p, 'p')}${macroBar('Жиры', n.f, g.f, 'f')}${macroBar('Углеводы', n.c, g.c, 'c')}
       </section>`;
-    }).join('')}`);
+    }).join('')}
+    ${canEat(wk, day) && planOf(wk).some(e => covers(e, day)) ? (() => {
+      const ec = dayEatenCount(wk, day), all = ec.done === ec.total;
+      return `<button class="btn ${all ? 'ghost' : 'primary'} wide" data-act="eatDay" data-day="${day}" data-v="${all ? 0 : 1}">${all ? `${I.undo}<span>Снять отметки за день</span>` : `${I.check}<span>Отметить весь день съеденным</span>`}</button>`;
+    })() : ''}`);
 }
 
 // ---------- Шторка: блюдо ----------
@@ -1314,8 +1353,23 @@ const A = {
   },
   editEntry(el) {
     const e = planOf(curWeek()).find(x => x.id === el.dataset.id);
-    if (e) openEntry(e, false);
+    if (e) openEntry(e, false, el.dataset.day != null ? Number(el.dataset.day) : e.day);
   },
+  eatToggle(el) {
+    const wk = curWeek();
+    const e = planOf(wk).find(x => x.id === el.dataset.id);
+    if (!e) return;
+    if (toggleEaten(wk, e, Number(el.dataset.day)) === 'all') buzz();
+    update();
+  },
+  eatPerson(el) {
+    const wk = curWeek();
+    const e = planOf(wk).find(x => x.id === draft.e.id);
+    if (!e) return;
+    if (toggleEaten(wk, e, draft.day, el.dataset.p) !== 'none') buzz();
+    update();
+  },
+  eatDay(el) { setDayEaten(curWeek(), Number(el.dataset.day), el.dataset.v === '1'); buzz(); update(); },
   draftSet(el) {
     const v = el.dataset.k === 'span' ? Number(el.dataset.v) : el.dataset.v;
     draft.e[el.dataset.k] = v; refreshSheet();

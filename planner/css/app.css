@@ -755,3 +755,56 @@ textarea.input { height: auto; padding: 12px 14px; line-height: 1.5; resize: ver
 .rv-item .item-name { font-size: 14px; }
 .rate-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 14px 2px 4px; }
 .rate-row > span { color: var(--muted); font-weight: 700; font-size: 13px; }
+
+/* ---------- Съедено ---------- */
+.eat {
+  width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; flex: none; margin-left: 2px;
+  border: 2px solid var(--line-2); color: transparent; transition: background .2s, border-color .2s, transform .15s var(--ease);
+  position: relative;
+}
+.eat::before { content: ''; position: absolute; inset: -8px; } /* крупнее зона нажатия */
+.eat svg { width: 15px; height: 15px; stroke-width: 3; }
+.eat:active { transform: scale(.85); }
+.eat.all { background: var(--have); border-color: var(--have); color: #0b0c12; animation: tick .3s var(--ease); }
+.eat.part { border-color: var(--have); color: var(--have); background: linear-gradient(90deg, rgba(52, 211, 153, .25) 50%, transparent 50%); }
+@keyframes tick { 50% { transform: scale(1.2); } }
+.chip.eaten { background: rgba(52, 211, 153, .07); border-color: rgba(52, 211, 153, .3); }
+.chip.eaten .chip-name { color: var(--muted); }
+.chip.eaten .chip-emoji { filter: saturate(.6); }
+
+.eat-pill { display: inline-flex; align-items: center; gap: 2px; margin-left: 8px; vertical-align: 2px; font-size: 11px; font-weight: 800; padding: 2px 7px 2px 4px; border-radius: 99px; background: rgba(255, 255, 255, .06); color: var(--muted); }
+.eat-pill svg { width: 13px; height: 13px; stroke-width: 3; }
+.eat-pill.full { background: rgba(52, 211, 153, .16); color: var(--have); }
+
+.today-eaten { margin-top: 14px; padding: 12px; border-radius: var(--r-sm); background: rgba(255, 255, 255, .035); border: 1px solid var(--line); cursor: pointer; }
+.today-eaten > small { display: block; font-size: 12px; font-weight: 800; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 8px; }
+.te-row { display: grid; grid-template-columns: minmax(0, 54px) 1fr auto; align-items: center; gap: 10px; font-size: 13px; font-weight: 700; }
+.te-row + .te-row { margin-top: 7px; }
+.te-row > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.te-row.me > span { color: var(--me); } .te-row.him > span { color: var(--him); }
+.te-track { height: 8px; border-radius: 99px; background: rgba(255, 255, 255, .07); overflow: hidden; }
+.te-track i { display: block; height: 100%; border-radius: inherit; transition: width .5s var(--ease); }
+.te-row.me i { background: var(--me); } .te-row.him i { background: var(--him); }
+.te-row b { font-size: 13px; white-space: nowrap; }
+.te-row b small { color: var(--muted); font-weight: 600; }
+
+.eat-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: 8px; }
+.eat-btn {
+  display: flex; align-items: center; gap: 10px; padding: 11px 12px; border-radius: var(--r-sm); text-align: left;
+  background: var(--surface-2); border: 1px solid var(--line); transition: background .2s, border-color .2s; min-width: 0;
+}
+.eat-btn i { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; flex: none; border: 2px solid var(--line-2); color: transparent; }
+.eat-btn i svg { width: 15px; height: 15px; stroke-width: 3; }
+.eat-btn span { font-weight: 800; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.eat-btn small { margin-left: auto; font-size: 11.5px; color: var(--muted); font-weight: 700; white-space: nowrap; }
+.eat-btn.me span { color: var(--me); } .eat-btn.him span { color: var(--him); }
+.eat-btn.on { background: rgba(52, 211, 153, .1); border-color: rgba(52, 211, 153, .35); }
+.eat-btn.on i { background: var(--have); border-color: var(--have); color: #0b0c12; }
+.eat-btn.on small { color: var(--have); }
+
+.ds-eaten { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; padding: 9px 12px; margin-bottom: 12px; border-radius: 12px; background: rgba(52, 211, 153, .08); font-size: 13px; font-weight: 700; }
+.ds-eaten > span { display: inline-flex; align-items: center; gap: 4px; color: var(--have); }
+.ds-eaten svg { width: 15px; height: 15px; stroke-width: 3; }
+.ds-eaten b small { color: var(--muted); font-weight: 600; }
+.ds-eaten > small { color: var(--muted); }
+.day-stat .ds-eaten b small, .day-stat .ds-eaten > small { color: var(--muted); }
